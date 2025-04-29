@@ -6,6 +6,9 @@ const nextConfig = {
   output: 'export',
   basePath: '/blog',
   reactStrictMode: false,
+  images: {
+    unoptimized: true,
+  },
 }
 
 module.exports = withContentlayer(nextConfig)

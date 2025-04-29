@@ -7,13 +7,8 @@ import SiteHeader from '@/layout/HeaderLayout'
 import SiteScrollTop from '@/components/SiteScrollTop'
 
 export const metadata: Metadata = {
-  title: 'Blog of djdg626',
-  description: '博客,IT,技术,生活,日常分享,教程,前端,JavaScript',
-  verification: {
-    other: {
-      'baidu-site-verification': 'codeva-oWPv6vmEax',
-    },
-  },
+  title: '学习小结',
+  description: '博客,IT,工程,技术,生活,日常分享,教程,前端,JavaScript',
 }
 
 const SiteSearch = dynamic(() => import('@/components/SiteSearch'), { ssr: true })
@@ -28,7 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
           <SiteSearch />
 
-          <Script src="/iconfont.js" strategy="lazyOnload" />
+          <Script src="/blog/iconfont.js" strategy="lazyOnload" />
         </div>
 
         <SiteScrollTop />

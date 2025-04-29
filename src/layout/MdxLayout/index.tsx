@@ -3,6 +3,7 @@ import { CodeBlock } from './code-block'
 import Icon from '@/components/SiteIcon'
 import { Heading1, Heading2, Heading3, HeadingSmall } from './HeadingTags'
 import Alert from '@/components/SiteAlert'
+import DocumentViewer from '@/components/DocumentViewer'
 import WaterFall from '@/components/SiteWaterFall'
 import ImgBlock from './ImgBlock'
 
@@ -68,6 +69,7 @@ export const mdxComponents = {
     return <table className="table [&>thead]:text-inherit">{props.children}</table>
   },
   Alert: Alert,
+  DocumentViewer: DocumentViewer,
   WaterFall: WaterFall,
   img: ImgBlock,
 }

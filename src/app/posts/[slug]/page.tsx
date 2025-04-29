@@ -7,7 +7,6 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import mdxComponents from '@/layout/MdxLayout'
-import SiteComments from '@/components/SiteComments'
 import SiteGallery from '@/components/SiteGallery'
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
@@ -74,8 +73,6 @@ export default async function PostLayout({ params }: { params: { slug: string } 
           <MDXContent components={mdxComponents} />
         </SiteGallery>
       </article>
-
-      <SiteComments slug={params.slug} />
     </div>
   )
 }

@@ -8,7 +8,6 @@ const headerNavLinks = [
   { href: '/', title: '首页' },
   { href: '/archives/posts', title: '归档' },
   // { href: '/tags', title: '标签' },
-  { href: '/about', title: '关于' },
 ]
 
 const ToggleTheme = dynamic(() => import('./ToggleTheme'), { ssr: true })
@@ -18,7 +17,7 @@ const ToggleSearchShow = dynamic(() => import('./ToggleSearchShow'), { ssr: true
 function HeaderLeft() {
   return (
     <Link href={'/'} className="text-xl font-bold">
-      测试页面
+      学习小结
     </Link>
   )
 }

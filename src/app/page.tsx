@@ -1,10 +1,8 @@
 // app/page.tsx
 import { allPosts } from 'contentlayer/generated'
 import dayjs from 'dayjs'
-import SiteSlide from '@/components/SiteSlide'
 import SiteSidebar from '@/components/SiteSidebar'
 import ListLayout from '@/layout/ListLayout'
-import FooterLayout from '@/layout/FooterLayout'
 import dataConfig from 'data'
 
 export default function List() {
@@ -21,8 +19,6 @@ export default function List() {
 
         <SiteSidebar />
       </div>
-
-      <FooterLayout />
     </>
   )
 }

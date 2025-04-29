@@ -3,10 +3,7 @@ const dataConfig = {
 
   themeLight: 'light', // daisyui光明模式名称
   themeDark: 'night', // daisyui黑暗模式名称
-  defaultTheme: 'night', // 默认模式
-
-  author: 'djdg626',
-  introduction: '练习时长两年半的前端练习生',
+  defaultTheme: 'light', // 默认模式
 }
 
 export default dataConfig
