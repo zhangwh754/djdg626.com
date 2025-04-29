@@ -6,7 +6,7 @@ import Link from 'next/link'
 
 const headerNavLinks = [
   { href: '/', title: '首页' },
-  { href: '/archives', title: '归档' },
+  { href: '/archives/posts', title: '归档' },
   // { href: '/tags', title: '标签' },
   { href: '/about', title: '关于' },
 ]
@@ -18,7 +18,7 @@ const ToggleSearchShow = dynamic(() => import('./ToggleSearchShow'), { ssr: true
 function HeaderLeft() {
   return (
     <Link href={'/'} className="text-xl font-bold">
-      djdg626的博客
+      测试页面
     </Link>
   )
 }

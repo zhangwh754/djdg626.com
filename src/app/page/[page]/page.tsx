@@ -15,7 +15,8 @@ function getValidateParams() {
   return paths
 }
 
-export const generateStaticParams = async () => {
+// 修改：添加 export 关键字
+export async function generateStaticParams() {
   return getValidateParams()
 }
 
