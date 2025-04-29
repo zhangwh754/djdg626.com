@@ -29,7 +29,7 @@ const ArticleTags = ({ tagStr }: { tagStr: string }) => {
       {tagStr.split(',').map((tag, index) => {
         return (
           <Link
-            href={`/archives/tags/${tag}`}
+            href={`/archives/tags/${encodeURIComponent(tag)}`}
             className="mx-1 px-3 bg-base-200 rounded-md hover:bg-info hover:text-info-content"
             key={tag}
           >

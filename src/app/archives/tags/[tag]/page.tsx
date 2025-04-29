@@ -19,12 +19,12 @@ export async function generateStaticParams() {
     .filter((item, index, arr) => arr.indexOf(item) === index)
 
   return tags.map(tag => ({
-    tag: encodeURIComponent(tag),
+    tag: encodeURI(tag),
   }))
 }
 
 export default function SitePostsByTag({ params }: { params: { tag: string } }) {
-  const tag = decodeURIComponent(params.tag)
+  const tag = decodeURI(params.tag)
   const tags = getTags().map(item => item.tag)
 
   if (!tags.includes(tag)) throw notFound()

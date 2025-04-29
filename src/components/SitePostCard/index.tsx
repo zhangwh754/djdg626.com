@@ -14,7 +14,7 @@ export default function PostCard(post: Post) {
         </time>
         <div className="flex items-center justify-end flex-wrap gap-y-2">
           {tags.map(tag => (
-            <Link key={tag} href={`/archives/tags/${tag}`}>
+            <Link key={tag} href={`/archives/tags/${encodeURIComponent(tag)}`}>
               <span className="text-sm ml-2 px-2 py-1 bg-blue-100 text-blue-800 dark:bg-primary dark:text-primary-content rounded-full">
                 #{tag}
               </span>

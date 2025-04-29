@@ -30,10 +30,14 @@ export default function SiteTags() {
           'text-[#00FFFF]',
         ][index % 8] as ITagTextColor
 
+        const encodedTag = encodeURI(tag)
+
+        console.log(tag, encodedTag)
+
         return (
           <Link
             key={index}
-            href={`/archives/tags/${tag}`}
+            href={`/archives/tags/${encodedTag}`}
             className={`flex-1 basis-20 shrink-0 px-2 py-1 text-center ${color} whitespace-pre hover:bg-slate-100 dark:hover:bg-slate-600 rounded`}
           >
             {tag}({tagsAndCounts[tag]})
