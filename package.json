@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@giscus/react": "^2.4.0",
+    "@octokit/webhooks": "^13.8.2",
     "@vercel/analytics": "^1.1.2",
     "contentlayer": "^0.3.4",
     "dayjs": "^1.11.10",
