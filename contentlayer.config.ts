@@ -1,7 +1,7 @@
 // contentlayer.config.ts
 import crypto from 'crypto'
 
-import { defineDocumentType, makeSource } from 'contentlayer/source-files'
+import { defineDocumentType, makeSource } from 'contentlayer2/source-files'
 import remarkGfm from 'remark-gfm'
 import rehypePrettyCode, { type Options as PrettyCodeOptions } from 'rehype-pretty-code'
 import { calculateReadingTimeWithImages } from './src/lib/getReadTime'

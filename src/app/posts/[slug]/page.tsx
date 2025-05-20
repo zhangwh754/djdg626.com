@@ -2,7 +2,7 @@
 
 import { Metadata } from 'next'
 import { allPosts } from 'contentlayer/generated'
-import { useMDXComponent } from 'next-contentlayer/hooks'
+import { useMDXComponent } from 'next-contentlayer2/hooks'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import dayjs from 'dayjs'

@@ -11,16 +11,16 @@
   "dependencies": {
     "@giscus/react": "^2.4.0",
     "@vercel/analytics": "^1.1.2",
-    "contentlayer": "^0.3.4",
+    "contentlayer2": "^0.4.6",
     "dayjs": "^1.11.10",
     "lightgallery": "^2.7.2",
     "lodash": "^4.17.21",
     "next": "14.1.1",
-    "next-contentlayer": "^0.3.4",
+    "next-contentlayer2": "^0.4.6",
     "react": "^18",
     "react-dom": "^18",
     "rehype-pretty-code": "^0.12.3",
-    "remark-gfm": "^3.0.1",
+    "remark-gfm": "^4.0.1",
     "zustand": "^4.4.7"
   },
   "devDependencies": {
