@@ -10,24 +10,19 @@ RUN apk update
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# install pnpm
-RUN npm install -g pnpm
 
 COPY package.json  ./
-COPY pnpm-lock.yaml ./
+COPY package-lock.json ./
 RUN npm config set registry https://registry.npmmirror.com \
-  && npm_config_platform=linux npm_config_arch=x64 npm_config_libc=glibc pnpm i
+  && npm_config_platform=linux npm_config_arch=x64 npm_config_libc=glibc npm i
 
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
 
-# install pnpm
-RUN npm install -g pnpm
-
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN pnpm run build
+RUN npm run build
 
 # 可使用自定义参数变量来打包
 # RUN npm run ${ENV}
