@@ -4,12 +4,9 @@ const { withContentlayer } = require('next-contentlayer')
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
-  output: 'standalone',
+  output: process.platform === 'win32' ? undefined : 'standalone',
   reactStrictMode: false,
   experimental: {
-    serverActions: {
-      allowedOrigins: ['xxx.com'],
-    },
     //指定分配cpu 防止 build cpu 占用过高
     workerThreads: false,
     cpus: 1,
