@@ -120,7 +120,7 @@ export default App
 
 可以看到 TodoListContext.Provider 导致了组件不必要的更新
 
-![](http://116.198.244.73:9000/images/20240820231120.png)
+![](https://image.084612.xyz/20240820231120.png)
 
 解决方式是把Context.Provider拆分到另一个组件，用props.children来渲染组件内容
 
@@ -156,7 +156,7 @@ const Noon = () => {
 
 修改后，空组件只在初始化时渲染了，在 reducer state 更新时没有进行更新
 
-![](http://116.198.244.73:9000/images/20240820231517.png)
+![](https://image.084612.xyz/20240820231517.png)
 
 ### 参考
 

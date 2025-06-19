@@ -1,0 +1,45 @@
+---
+title: echarts配置较优雅的写法
+date: 2025/06/05 13:53:08
+tag: echarts
+description: 在页面中有大量echarts的情况下时，代码中会混入很多的options，最后会导致代码很臃肿，同时如果有公用项修改时改动比较麻烦，参考了其它的博文后写出了本文章
+---
+
+## echarts 基础配置项介绍
+
+### 标题-title
+
+- echarts 的标题组件，常用的配置项有 show、定位、textStyle 等
+- `title.text`需要动态传入
+
+### 图例-legend
+
+- echarts 的图例组件，常用的配置项有 show、定位、data 等
+- `legend.data`需要动态传入
+
+### 提示-tooltip
+
+- echarts 的提示组件，常用的配置项有 show、trigger、formatter 等
+- `tooltip.formatter`可能需要动态传入，且为一个回调函数
+
+### 颜色-color
+
+- echarts 的颜色组件，一般是一个字符串数组
+- `color`需要动态传入（单色、渐变色等）
+
+### 轴-axis
+
+- 分为 x 轴和 y 轴，常用的配置项有 type、axisLine、splitLine 等
+- xAxis 和 yAxis 在多系列时有可能是一个数组
+
+### 网格-grid
+
+- 常用配置项有 定位、containerLabel
+
+## 通用项配置复用
+
+echarts.option 除了大量的上述配置项外，还有如 series 的系列配置，系列配置通常复用程度比较小。
+
+```js
+const defaultOptions = {}
+```
