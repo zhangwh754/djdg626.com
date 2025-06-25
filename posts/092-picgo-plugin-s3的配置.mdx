@@ -1,0 +1,21 @@
+---
+title: picgo-plugin-s3的配置
+date: 2025/06/25 15:49:39
+tag: picgo
+description: picgo的r3文件存储插件的配置
+---
+
+## 配置项
+
+![配置上半部分]https://image.084612.xyz/20250625152405698.png
+![配置下半部分](https://image.084612.xyz/20250625161339190.png)
+
+### 配置自定义域名
+
+1. 协议：https
+2. 域名：image.084612.xyz
+3. 桶名：img-bucket
+
+```plaintext
+https://image.084612.xyz/{path:/^img-bucket\//,''}
+```
