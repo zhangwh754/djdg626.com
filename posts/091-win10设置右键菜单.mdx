@@ -1,0 +1,31 @@
+---
+title: win10设置右键菜单
+date: 2025/06/25 15:14:43
+tag: win10
+description: win10自定义右键菜单
+---
+
+## 步骤
+
+​1. ​ 打开注册表编辑器 ​​
+按 Win + R，输入 regedit 回车。
+​2. ​ 导航至目标路径 ​​
+HKEY_CLASSES_ROOT\Directory\Background\shell
+​3. ​ 新建注册表项 ​​
+右键 shell → 新建 → 项，命名为 Vscode（名称可自定义）。
+​​4. 设置菜单显示名称 ​​
+选中新建项 → 双击右侧默认字符串 → 输入右键菜单显示文本（例如 "用 Vscode 打开"）。
+​​5. 添加图标（可选）​​
+右键 VSCode → 新建 → 字符串值 → 命名为 Icon → 双击输入 VSCode 路径，如：
+"C:\Program Files\Microsoft VS Code\Code.exe"
+。
+​​6. 创建命令项 ​​
+右键 VSCode → 新建 → 项 → 命名为 command → 双击默认字符串 → 输入：
+"C:\Program Files\Microsoft VS Code\Code.exe" "%V"
+关键参数：
+%V 表示当前目录路径。
+若需在新窗口打开，可追加参数 -n（如 "...\Code.exe" -n "%V"）。
+
+## 效果
+
+![](https://image.084612.xyz/20250625154833571.png)
