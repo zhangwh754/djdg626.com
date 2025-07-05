@@ -1,0 +1,16 @@
+---
+title: 微信小程序picker-view回显错位
+date: 2025/07/05 19:16:01
+tag: 微信小程序
+description: picker-view的value参数和实际显示的picker-view展示的不一致
+---
+
+## 问题描述
+
+在微信小程序中使用`picker-view`组件时，设置了`value`参数，但实际显示的内容和预期不一致，出现错位现象。
+
+## 解决方式
+
+在`picker-view`组件中，需要再 picker-view 组件显示出来后，再设置`value`参数，才能正常显示，否则会错位。
+
+- 可以通过设置定时器来实现
