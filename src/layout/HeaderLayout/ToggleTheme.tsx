@@ -7,41 +7,52 @@ import { shallow } from 'zustand/shallow'
 import dataConfig from 'data'
 
 function ToggleTheme() {
-  const [mounted, setMounted] = useState(true)
-  const { isDark, toggleDark } = useThemeStore(
+  const [mounted, setMounted] = useState(false)
+  const { isDark, toggleDark, setDark } = useThemeStore(
     state => ({
       isDark: state.isDark,
       toggleDark: state.toggleDark,
+      setDark: state.setDark,
     }),
     shallow
   )
 
   useEffect(() => {
-    const initialTheme = window.localStorage.getItem('data-theme') || dataConfig.defaultTheme
+    // 页面已经通过内联脚本初始化了主题，这里只需要同步状态
+    const savedTheme = localStorage.getItem('data-theme') || dataConfig.defaultTheme
+    const isDarkTheme = savedTheme === dataConfig.themeDark
 
-    const theme = initialTheme !== dataConfig.themeLight ? dataConfig.themeDark : dataConfig.themeLight
-
-    localStorage.setItem('data-theme', theme)
-    document.documentElement.setAttribute('data-theme', theme)
-
-    if (initialTheme !== dataConfig.themeLight) {
-      toggleDark()
+    // 同步Zustand状态与localStorage
+    if (isDarkTheme !== isDark) {
+      setDark(isDarkTheme)
     }
 
-    // When mounted on client, now we can show the UI
+    // 标记组件已挂载
     setMounted(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [isDark, setDark])
 
   if (!mounted) {
     return null
   }
 
   const switchTheme = () => {
-    const theme = isDark ? dataConfig.themeLight : dataConfig.themeDark
+    // 切换主题
+    const newIsDark = !isDark
+    const theme = newIsDark ? dataConfig.themeDark : dataConfig.themeLight
+
+    // 更新状态
     toggleDark()
+
+    // 更新DOM和localStorage
     localStorage.setItem('data-theme', theme)
     document.documentElement.setAttribute('data-theme', theme)
+
+    // 更新dark类
+    if (newIsDark) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
   }
 
   return (
@@ -51,7 +62,7 @@ function ToggleTheme() {
         className="ml-auto sm:ml-1 p-1 rounded-md w-8 h-8 flex justify-center items-center"
         onClick={() => switchTheme()}
       >
-        {mounted && isDark ? (
+        {isDark ? (
           <Icon name="light" className={`w-4 h-4`}></Icon>
         ) : (
           <Icon name="dark" className={`w-4 h-4`}></Icon>
