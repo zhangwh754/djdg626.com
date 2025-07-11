@@ -1,0 +1,19 @@
+---
+title: uniapp打包的h5在webview-h5下queryString和路由冲突导致页面路由加载失败的问题
+date: 2025/07/11 13:35:00
+tag: uniapp
+description:
+---
+
+## 问题
+
+在类企业微信（i 国网）的环境下，遇到了离线应用打包的 h5 页面跳转到另一个 h5 页面，在.html 后拼接了 queryString 参数，导致页面虽然加载了但是路由没有加载到。
+
+## 解决方式
+
+1. 去除 queryString 参数 - 在本项目中不合适，因为项目需要 queryString 参数。
+2. 在 uniapp 的 App.vue 中进行手动重定向 - 使用了这种方案
+
+## 错误页面的 Location
+
+![](https://image.084612.xyz/20250711133951617.jpg)
