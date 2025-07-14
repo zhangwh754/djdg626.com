@@ -46,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             }
           `
         }} />
+        <meta name="baidu-site-verification" content="codeva-hoe6twosR8" />
       </head>
       <body>
         <div className="relative pt-[5.5rem] flex flex-col min-h-screen text-base-content bg-base-200 dark:bg-[#2a303c] transition-colors">
