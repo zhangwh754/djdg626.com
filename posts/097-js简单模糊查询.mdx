@@ -1,0 +1,64 @@
+---
+title: js简单模糊查询
+date: 2025/07/24 10:08:47
+tag: js
+description: 使用正则表达式模糊匹配文本
+---
+
+## 单个匹配
+
+```js
+const data = [
+  { title: '你好世界' },
+  { title: '测试文本' },
+  { title: '世界你好' },
+  { title: '好世界' },
+  { title: '你好啊世界' },
+]
+
+const validate = search => {
+  let str = ['', ...search, ''].join('.*')
+  let reg = new RegExp(str)
+  let newData = data.filter(item => reg.test(item.title))
+
+  return newData
+}
+
+console.log(validate('你好'))
+// [
+//   {
+//     title: '你好世界',
+//   },
+//   {
+//     title: '世界你好',
+//   },
+//   {
+//     title: '你好啊世界',
+//   },
+// ]
+```
+
+## 多个匹配
+
+```js
+const data = [
+  { title: '你好世界', msg: 'Hello World' },
+  { title: '世界你好', msg: '测试文本' },
+  { title: '世界测试', msg: '嘿嘿' },
+]
+
+const validate = (search, keys = ['title']) => {
+  if (!search) return data
+
+  // 将搜索词拆分成字符，用.*连接形成正则表达式
+  const pattern = search.split('').join('.*')
+  const reg = new RegExp(pattern, 'i') // 添加i标志，忽略大小写
+
+  return data.filter(item => {
+    // 在指定的字段中搜索
+    return keys.some(key => reg.test(item[key]))
+  })
+}
+
+console.log(validate('测试', ['title', 'msg']))
+```
