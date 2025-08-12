@@ -1,0 +1,32 @@
+---
+title: cross-env指定环境变量失效
+date: 2025/08/12 10:26:38
+tag: js,webpack,vite
+description: 使用webpack开发浏览器插件时cross-env失效，发现是修改了打包命令导致的
+---
+
+## 发生情况
+
+使用 webpack 开发浏览器插件时 cross-env 失效，发现是修改了打包命令导致的。
+
+最开始直接使用 `cross-env` 来设置环境变量，运行正常
+
+```bash
+cross-env NODE_ENV=development webpack --config webpack.config.js
+```
+
+后面增加了一个 node 脚本修改打包时的代码，导致了`cross-env`失效
+
+```bash
+cross-env NODE_ENV=development node ./scripts/modify.js && webpack --config webpack.config.js
+```
+
+## 解决方法
+
+将 `cross-env` 放在 `webpack` 命令前面即可
+
+错误的防止`cross-env`的位置会导致`cross-env`失效
+
+```bash
+node ./scripts/modify.js && cross-env NODE_ENV=development webpack --config webpack.config.js
+```
