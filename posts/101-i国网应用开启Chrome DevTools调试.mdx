@@ -1,0 +1,31 @@
+---
+title: i国网应用开启Chrome DevTools调试
+date: 2025/08/18 11:25:24
+tag: i国网,webview
+description:
+---
+
+## 开启 Chrome DevTools 调试
+
+### Chrome
+
+Chrome DevTools：在 Chrome 浏览器中输入 chrome://inspect，可以看到连接的 Android 设备上的 WebView 实例
+
+### i 国网
+
+调试开关中开启：
+
+- 工具
+  1. 允许 js 调用
+- 调试
+  1. webview 相关
+  - 开启 Webview 调试
+  - use xweb
+  - use xfile
+  - 延迟小程序初始化到 xweb 初始化启动成功之后
+  2. 启用 logcat 和详细日志
+  3. 打开详细网络日志开关
+  4. 切换账号列表显示详细账号信息
+  5. 开启 ui 调试工具
+
+![chrome://inspect页面](https://image.084612.xyz/20250818163752803.png)
