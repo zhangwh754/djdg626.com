@@ -1,0 +1,39 @@
+---
+title: vue页面用js主动触发vant-upload的input点击事件
+date: 2025/08/22 14:57:12
+tag: js,vue,vant
+description: 外部用函数/事件触发vant-upload的点击事件
+---
+
+## 需求描述
+
+现在需要在某个异步事件成功后，主动触发 vant-upload 的图片选择事件，首先使用了 ref 获取了子组件的实例，但是实例上没有 click 方法
+
+## 解决方法
+
+拿到子组件实例后，再通过 `ref.$el` 获取到组件的根元素，然后获取到 `input[type="file"]` 元素，最后触发`input`元素的点击事件。
+
+```js showLineNumbers {4}
+const uploaderRef = ref()
+
+onMounted(() => {
+  const uploaderInput = uploaderRef.value.$el?.querySelector('input[type="file"]')
+  uploaderInput?.click()
+})
+```
+
+```vue showLineNumbers {2}
+<van-uploader
+  ref="uploaderRef"
+  v-bind="$attrs"
+  :deletable="!isDisabled"
+  v-model="$fileList"
+  :show-upload="!isDisabled"
+  :max-count="maxCount"
+  :preview-full-image="false"
+  :multiple="maxCount > 1"
+  :after-read="uploadWhenDev"
+  :before-delete="beforeDelete"
+  @click-preview="clickPreview"
+></van-uploader>
+```
