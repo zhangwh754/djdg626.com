@@ -1,0 +1,103 @@
+---
+title: vant-uploader使用readonly导致意料之外的问题
+date: 2025/08/25 10:25:04
+tag: vue3,vant
+description: 一次在使用vant-uploader时出现的js调用错误的问题
+---
+
+## 问题和背景
+
+在使用 vant-uploader 时，发现一个奇怪的问题
+
+项目的背景是一个 h5 混合应用，图片上传应该使用 app 端的 jsBridge 进行上传，又为了 h5 端的开发方便，额外实现了 h5 侧的图片上传，使用了 vant-uploader 自带的图片选择逻辑。
+
+### 具体实现代码
+
+在开发环境时，`hide`类不生效，会触发 `vant-uploader` 的 `uploadWhenDev` 方法
+
+在生产环境时，`hide`类生效，不会触发 `uploadWhenDev` 方法，而是进入自己添加的`chooseImaged`方法
+
+```vue showLineNumbers {31,43}
+<script setup>
+/**
+ * @description: 仅会在i国网环境触发
+ * @description: 图片选择并上传方法
+ */
+const chooseImaged = async () => {
+  //...
+}
+
+/**
+ * @description: 仅开发环境触发
+ * @description: 图片选择并上传方法
+ */
+const uploadWhenDev = async () => {
+  //...
+}
+
+const isDev = computed(() => {
+  const isDev = import.meta.env.MODE === 'dev'
+  return isDev
+})
+</script>
+
+<template>
+  <div>
+    <div v-if="title" class="title" :class="{ required }">{{ title }}</div>
+
+    <van-uploader
+      ref="uploaderRef"
+      v-bind="$attrs"
+      :class="{ hide: !isDev }"
+      :deletable="!isDisabled"
+      v-model="$fileList"
+      :show-upload="!isDisabled"
+      :max-count="maxCount"
+      :preview-full-image="false"
+      :multiple="maxCount > 1"
+      :after-read="uploadWhenDev"
+      :before-delete="beforeDelete"
+      @click-preview="clickPreview"
+    >
+      <!-- i国网app环境，使用api获取图片 -->
+      <div v-if="!isDisabled" class="van-uploader__upload" @click="chooseImaged">
+        <i class="van-icon van-icon-photograph van-uploader__upload-icon"></i>
+      </div>
+    </van-uploader>
+  </div>
+</template>
+
+<style scoped lang="scss">
+.title {
+  color: #000000e6;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+}
+
+:deep(.van-uploader) {
+  margin-top: 12px;
+
+  &.hide {
+    .van-uploader__input {
+      display: none;
+    }
+  }
+
+  .van-uploader__preview {
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .van-image__img {
+    border: 1px solid #dcdfe6;
+  }
+}
+</style>
+```
+
+## 问题和解决
+
+最后经过排查，是因为使用组件时添加了`readonly`属性，导致了 `vant-uploader` 的 `after-read` 方法没有被调用。而是在开发环境直接进入了`chooseImaged`方法，不符合预期。
+
+`readonly`属性被 v-bind="$attrs"属性所绑定
