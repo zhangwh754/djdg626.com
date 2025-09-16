@@ -1,0 +1,579 @@
+---
+title: ESC&POS指令蓝牙打印机对接
+date: 2025/09/16 09:52:21
+tag: 硬件
+description: 对接ESC/POS通用指令的热敏蓝牙打印机
+---
+
+## 打印指令集封装和使用
+
+通过 ESC/POS 指令集可以控制打印机的行为，如初始化、设置文字行高、对齐方式、加粗、下划线、字体大小等。
+
+同时使用了 iconv-lite 库来处理中文字符编码（GB2312），确保打印输出正确显示中文。
+
+### 常用的指令封装函数
+
+```js
+import { encode } from 'iconv-lite'
+
+export function printInit(commands) {
+  commands.push(0x1b, 0x40) // 初始化打印机
+  commands.push(0x1c, 0x26) // 选择中文字符集
+}
+
+export function setLineHeight(commands, lineHeight = 1) {
+  commands.push(0x1b, 0x33, lineHeight)
+}
+
+export function setCenter(commands) {
+  commands.push(0x1b, 0x61, 0x01)
+}
+
+export function setLeft(commands) {
+  commands.push(0x1b, 0x61, 0x00)
+}
+
+export function setRight(commands) {
+  commands.push(0x1b, 0x61, 0x02)
+}
+
+export function setBold(commands) {
+  commands.push(0x1b, 0x45, 0x01)
+}
+
+export function setNormal(commands) {
+  commands.push(0x1b, 0x45, 0x00)
+}
+
+export function setUnderline(commands) {
+  commands.push(0x1b, 0x2d, 0x01)
+}
+
+export function setNoUnderline(commands) {
+  commands.push(0x1b, 0x2d, 0x00)
+}
+
+const fontSizeMap = {
+  0: 0x00, // 1×1 (最小)
+  1: 0x01, // 新增：1.5×1（宽度放大50%，高度不变）
+  2: 0x11, // 2×1
+  3: 0x12, // 2×2（或调整为其他值）
+  4: 0x22, // 最大
+}
+
+/**
+ * @description: 设置字体大小，数字越大，字体越大
+ * @param {Array} commands
+ * @param {0|1|2|3|4} size
+ */
+export function setFontSize(commands, size) {
+  commands.push(0x1d, 0x21, fontSizeMap[size])
+}
+
+export const addTextToCommand = (commands, text) => {
+  const buffer = encode(text, 'GB2312')
+  const array = Array.from(buffer).map(x => '0x' + x.toString(16).toUpperCase().padStart(2, '0'))
+  commands.push(...array)
+}
+
+// 走纸n行
+export const scrollPaper = (commands, n) => {
+  commands.push(0x1b, 0x64, n)
+}
+```
+
+### 使用封装的指令
+
+```js
+const commands = []
+printInit(commands)
+setLineHeight(commands, 1)
+
+setCenter(commands)
+setBold(commands)
+setFontSize(commands, '1')
+addTextToCommand(commands, '用户承诺书\n\n')
+scrollPaper(commands, 1)
+
+// ...更多esc/pos指令
+
+startPrint(commands) // 开始打印命令见下一部分蓝牙相关封装
+```
+
+## 蓝牙相关封装（类企业微信/微信小程序）
+
+PS: 打印命令推荐分多次传递字节，避免内容过多时蓝牙崩溃？
+
+```js
+// 使用打印机钩子
+const { device, connectStatus, disconnect, forgetDevice, startPrint } = usePrint()
+```
+
+```js
+// usePrint.js的vue组合式函数封装-01打印机状态管理服务
+import { ref } from 'vue'
+
+// 创建共享的响应式状态
+const deviceList = ref([])
+const loading = ref(false)
+const finished = ref(false)
+const device = ref(null)
+const connectStatus = ref(false)
+
+// 本地存储键名
+const PRINTER_DEVICE_KEY = '1002838.LAST_CONNECTED_PRINTER_DEVICE'
+
+// 保存设备信息到本地存储
+const saveDeviceToStorage = deviceInfo => {
+  if (!deviceInfo) return
+
+  try {
+    const deviceData = {
+      deviceId: deviceInfo.deviceId,
+      name: deviceInfo.name,
+      serviceId: deviceInfo.serviceId,
+      write_uuid: deviceInfo.write_uuid,
+      timestamp: Date.now(),
+    }
+    localStorage.setItem(PRINTER_DEVICE_KEY, JSON.stringify(deviceData))
+  } catch (error) {
+    console.error('保存设备信息失败:', error)
+  }
+}
+
+// 从本地存储获取设备信息
+const getDeviceFromStorage = () => {
+  try {
+    const deviceData = localStorage.getItem(PRINTER_DEVICE_KEY)
+    if (!deviceData) return null
+
+    return JSON.parse(deviceData)
+  } catch (error) {
+    console.error('获取设备信息失败:', error)
+    return null
+  }
+}
+
+// 清除本地存储的设备信息
+const clearDeviceStorage = () => {
+  try {
+    localStorage.removeItem(PRINTER_DEVICE_KEY)
+  } catch (error) {
+    console.error('清除设备信息失败:', error)
+  }
+}
+
+// 更新设备连接状态
+const updateDeviceStatus = (newDevice, isConnected) => {
+  device.value = newDevice
+  connectStatus.value = isConnected
+
+  if (isConnected && newDevice) {
+    saveDeviceToStorage(newDevice)
+  }
+}
+
+// 导出共享状态和方法
+const printState = {
+  // 状态
+  deviceList,
+  loading,
+  finished,
+  device,
+  connectStatus,
+
+  // 方法
+  saveDeviceToStorage,
+  getDeviceFromStorage,
+  clearDeviceStorage,
+  updateDeviceStatus,
+}
+```
+
+```js
+// usePrint.js的vue组合式函数封装-02蓝牙打印服务
+import { printState } from './usePrintState'
+
+const env = import.meta.env
+
+export default function usePrint() {
+  // 使用共享状态
+  const { deviceList, loading, finished, device, connectStatus } = printState
+
+  // 初始化蓝牙适配器
+  const initBluetooth = async () => {
+    try {
+      if (typeof wx === 'undefined' || !wx.onBluetoothDeviceFound) {
+        console.error('当前环境不支持蓝牙功能')
+        return false
+      }
+
+      await openBluetoothAdapter()
+
+      // 读取低功耗蓝牙设备的特征值的二进制数据值
+      wx.onBLECharacteristicValueChange(function (res) {
+        console.log('发送数据') // mark
+      })
+
+      // 监听寻找新设备
+      wx.onBluetoothDeviceFound(devices => {
+        if (devices.length > 0) {
+          for (var i = 0; i < devices.length; i++) {
+            var device = devices[i]
+            // 确保设备名称不为空，并且不重复添加
+            if (device.name !== '') {
+              // 检查是否已经存在相同设备ID的设备
+              const existingDevice = printState.deviceList.value.find(d => d.deviceId === device.deviceId)
+              if (!existingDevice) {
+                printState.deviceList.value.push(device)
+              }
+            }
+          }
+        }
+      })
+
+      // 尝试自动连接上次的设备
+      await tryAutoConnect()
+
+      return true
+    } catch (error) {
+      console.error('初始化蓝牙适配器失败:', error)
+      return false
+    }
+  }
+
+  // 尝试自动连接上次的设备
+  const tryAutoConnect = async () => {
+    const lastDevice = printState.getDeviceFromStorage()
+    if (!lastDevice || !lastDevice.deviceId) return false
+
+    try {
+      console.log('尝试自动连接上次的设备:', lastDevice.name)
+
+      // 创建一个临时设备对象
+      const tempDevice = {
+        deviceId: lastDevice.deviceId,
+        name: lastDevice.name,
+        serviceId: lastDevice.serviceId,
+        write_uuid: lastDevice.write_uuid,
+      }
+
+      // 尝试连接
+      const result = await connect(tempDevice, true)
+      return result
+    } catch (error) {
+      console.error('自动连接失败:', error)
+      // 清除设备信息，避免下次继续尝试连接失败的设备
+      printState.clearDeviceStorage()
+      return false
+    }
+  }
+
+  // 初始化蓝牙适配器
+  const openBluetoothAdapter = () => {
+    return new Promise((resolve, reject) => {
+      wx.openBluetoothAdapter({
+        success: res => {
+          resolve(true)
+        },
+        fail: function (res) {
+          reject(res)
+        },
+      })
+    })
+  }
+
+  // 搜索蓝牙设备
+  const searchDevices = async () => {
+    printState.deviceList.value = []
+    printState.loading.value = true
+    printState.finished.value = false
+
+    try {
+      wx.invoke('startBluetoothDevicesDiscovery', { data: {} }, function (res) {})
+      return true
+    } catch (error) {
+      console.error('搜索蓝牙设备失败:', error)
+      printState.loading.value = false
+      return false
+    }
+  }
+
+  // 停止搜索蓝牙设备
+  const stopSearch = () => {
+    return new Promise((resolve, reject) => {
+      wx.stopBluetoothDevicesDiscovery({
+        success: function (res) {
+          resolve(true)
+        },
+        fail: function (res) {
+          reject(false)
+        },
+      })
+    })
+  }
+
+  // 连接蓝牙设备
+  const connect = async (selectedDevice, isAutoConnect = false) => {
+    try {
+      // 先设置临时设备对象，连接成功后再更新device状态
+      const tempDevice = { ...selectedDevice }
+      if (!isAutoConnect) {
+        await stopSearch()
+      }
+
+      await createBLEConnection(tempDevice.deviceId)
+      const services = await getBLEDeviceServices(tempDevice.deviceId)
+
+      for (let i = 0; i < services.length; i++) {
+        const service = services[i]
+        const characteristics = await getBLEDeviceCharacteristics(tempDevice.deviceId, service.uuid)
+
+        for (let j = 0; j < characteristics.length; j++) {
+          const characteristic = characteristics[j]
+
+          if (characteristic.properties.notify) {
+            await notifyBLECharacteristicValueChange(tempDevice.deviceId, service.uuid, characteristic.uuid, true)
+          }
+
+          if (characteristic.properties.write) {
+            tempDevice.serviceId = service.uuid
+            tempDevice.write_uuid = characteristic.uuid
+          }
+        }
+      }
+
+      // 连接成功后更新共享状态
+      printState.updateDeviceStatus(tempDevice, true)
+
+      return true
+    } catch (error) {
+      console.error('连接蓝牙设备失败:', error)
+
+      // 如果是自动连接失败，清除本地存储的设备信息
+      if (isAutoConnect) {
+        printState.clearDeviceStorage()
+      }
+
+      // 连接失败时更新共享状态
+      printState.updateDeviceStatus(null, false)
+      return false
+    }
+  }
+
+  // 创建BLE连接
+  const createBLEConnection = deviceId => {
+    return new Promise((resolve, reject) => {
+      wx.createBLEConnection({
+        deviceId: deviceId,
+        success: function (res) {
+          resolve(true)
+        },
+        fail: function (res) {
+          reject(res)
+        },
+      })
+    })
+  }
+
+  // 获取蓝牙设备所有服务
+  const getBLEDeviceServices = deviceId => {
+    return new Promise((resolve, reject) => {
+      wx.getBLEDeviceServices({
+        deviceId: deviceId,
+        success: function (res) {
+          resolve(res.services)
+        },
+        fail: function (res) {
+          reject(res)
+        },
+      })
+    })
+  }
+
+  // 获取蓝牙设备某个服务的特征值
+  const getBLEDeviceCharacteristics = (deviceId, serviceId) => {
+    return new Promise((resolve, reject) => {
+      wx.getBLEDeviceCharacteristics({
+        deviceId: deviceId,
+        serviceId: serviceId,
+        success: function (res) {
+          resolve(res.characteristics)
+        },
+        fail: function (res) {
+          reject(res)
+        },
+      })
+    })
+  }
+
+  // 特征值变化的notify回调
+  const notifyBLECharacteristicValueChange = (deviceId, serviceId, characteristicId, state) => {
+    return new Promise((resolve, reject) => {
+      wx.notifyBLECharacteristicValueChange({
+        deviceId: deviceId,
+        serviceId: serviceId,
+        characteristicId: characteristicId,
+        state: state,
+        success: function (res) {
+          resolve(true)
+        },
+        fail: function (res) {
+          resolve(false)
+        },
+      })
+    })
+  }
+
+  // 断开蓝牙连接
+  const disconnect = async () => {
+    if (!device.value || !device.value.deviceId) {
+      // 更新共享状态
+      printState.updateDeviceStatus(null, false)
+      return true
+    }
+
+    try {
+      await closeBLEConnection(device.value.deviceId)
+      // 更新共享状态
+      printState.updateDeviceStatus(null, false)
+      return true
+    } catch (error) {
+      console.error('断开蓝牙连接失败:', error)
+      // 即使断开失败，也更新共享状态
+      printState.updateDeviceStatus(null, false)
+      return false
+    }
+  }
+
+  // 关闭BLE连接
+  const closeBLEConnection = deviceId => {
+    return new Promise((resolve, reject) => {
+      wx.closeBLEConnection({
+        deviceId: deviceId,
+        success: function (res) {
+          console.log('断开蓝牙连接-成功', res)
+          resolve(true)
+        },
+        fail: function (res) {
+          console.log('断开蓝牙连接-失败', res)
+          reject(false)
+        },
+      })
+    })
+  }
+
+  // 重新连接
+  const reconnect = async () => {
+    await disconnect()
+    printState.deviceList.value = []
+    await initBluetooth()
+    return await searchDevices()
+  }
+
+  // 分段发送数据（解决内容多时打印不全的问题）
+  const sendDataInChunks = async buffer => {
+    if (!device.value || !connectStatus.value) {
+      throw new Error('打印机未连接')
+    }
+
+    // 每次发送的最大字节数
+    const maxChunkSize = 20
+    // 发送延迟（毫秒）
+    const delay = 200
+
+    // 创建一个 Uint8Array 视图
+    const dataView = new Uint8Array(buffer)
+    const length = dataView.length
+
+    // 分段发送数据
+    for (let i = 0; i < length; i += maxChunkSize) {
+      const end = Math.min(i + maxChunkSize, length)
+      const chunk = buffer.slice(i, end)
+
+      try {
+        await writeBLECharacteristicValue(chunk)
+        // 添加延迟以确保打印机有足够时间处理数据
+        await new Promise(resolve => setTimeout(resolve, delay))
+      } catch (error) {
+        console.error('发送数据块失败:', error)
+        throw error
+      }
+    }
+
+    return true
+  }
+
+  // 写入蓝牙特征值
+  const writeBLECharacteristicValue = buffer => {
+    return new Promise((resolve, reject) => {
+      if (!device.value || !connectStatus.value) {
+        reject('打印机未连接')
+        return
+      }
+
+      wx.writeBLECharacteristicValue({
+        deviceId: device.value.deviceId,
+        serviceId: device.value.serviceId,
+        characteristicId: device.value.write_uuid,
+        value: buffer,
+        success: res => {
+          console.log('写入成功', res)
+          resolve(true)
+        },
+        fail: err => {
+          console.error('写入失败', err)
+          reject(err)
+        },
+      })
+    })
+  }
+
+  const startPrint = async commands => {
+    // 转换为ArrayBuffer并发送文本部分
+    let textBuffer = new ArrayBuffer(commands.length)
+    let textDataView = new Uint8Array(textBuffer)
+    commands.forEach((value, index) => {
+      textDataView[index] = value
+    })
+
+    // 发送文本部分
+    return await sendDataInChunks(textBuffer)
+  }
+
+  // 忘记设备（清除本地存储）
+  const forgetDevice = () => {
+    printState.clearDeviceStorage()
+    return true
+  }
+
+  // 组件挂载时自动初始化蓝牙
+  onMounted(() => {
+    if (env.MODE != 'dev') {
+      initBluetooth()
+    }
+  })
+
+  // 组件卸载时断开连接
+  onUnmounted(() => {
+    disconnect()
+  })
+
+  return {
+    deviceList,
+    loading,
+    finished,
+    device,
+    connectStatus,
+    initBluetooth,
+    searchDevices,
+    stopSearch,
+    connect,
+    disconnect,
+    reconnect,
+    forgetDevice,
+
+    startPrint,
+  }
+}
+```
