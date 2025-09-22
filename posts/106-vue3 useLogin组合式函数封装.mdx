@@ -1,0 +1,90 @@
+---
+title: vue3 useLogin组合式函数封装
+date: 2025/09/18 16:05:12
+tag: vue3
+description: 封装一个支持跳转到指定路由的useLogin组合式函数
+---
+
+## 前言
+
+现在的需求是用户可以正常登录跳转首页，也可以在登录成功后跳转到指定的路由地址。
+
+## useLogin 组合式函数
+
+现在跳转到`/login?targetPath=/check`，登录成功后会跳转到`/check`页面。
+
+```js
+import { ref } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { showFailToast, showToast } from 'vant'
+import { getUserInfoBase } from '@/request/index'
+
+export default function useLogin() {
+  const env = import.meta.env
+  const authStore = useAuthStore()
+  const infoStore = useInfoStore()
+
+  const router = useRouter()
+  const route = useRoute()
+
+  const loading = ref(true)
+  const error = ref('')
+
+  // 初始化登录流程
+  const init = async () => {
+    try {
+      await getForwardTokenAndBaseUserInfo()
+
+      // 登录成功后，检查是否有目标页面参数
+      const targetPath = checkTargetPath()
+      navigateToPage(targetPath)
+    } catch (_error) {
+      error.value = _error?.message || _error?.msg || '登录失败'
+
+      console.error(error.value)
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const getForwardTokenAndBaseUserInfo = async () => {
+    authStore.setUserInfo({
+      account: env.VITE_APP_USERINFO_ACCOUNT,
+      name: env.VITE_APP_USERINFO_NAME,
+    })
+
+    await getTokenBusiness()
+  }
+
+  // 获取业务token
+  const getTokenBusiness = async () => {
+    // ...
+  }
+
+  const navigateToPage = targetPath => {
+    if (targetPath) {
+      router.replace({ path: targetPath })
+    } else {
+      router.replace({ path: '/check' }) // 默认跳转首页
+    }
+  }
+
+  // 检查URL中是否有目标页面参数
+  const checkTargetPath = () => {
+    const targetPath = route?.query?.targetPath
+
+    if (targetPath && typeof targetPath === 'string') {
+      return targetPath
+    }
+    return null
+  }
+
+  return {
+    loading,
+    error,
+    init,
+    checkTargetPath,
+  }
+}
+```
