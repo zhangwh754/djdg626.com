@@ -1,0 +1,121 @@
+---
+title: 安卓adb远程推送
+date: 2025/09/22 17:15:22
+tag: adb
+description: 通过adb远程连接手机，完成打包前端应用后不用数据线更新app沙盒的离线h5
+---
+
+## 远程 adb 连接设备
+
+### adb 远程配对（只需要一次）
+
+见`无线调试-使用配对码配对设备`
+
+```cmd
+adb pair [ip:port]
+
+Enter pairing code:xxxxxx
+```
+
+### adb 远程连接
+
+见`无线调试-ip地址和端口`
+
+```cmd
+adb connect [ip:port]
+```
+
+## adb 推送脚本
+
+包含了 adb 连接、文件检查、旧文件删除、新文件推送等
+
+```sh
+#!/bin/bash
+# deploy-adb.sh
+
+# 解析命令行参数
+MODE=""
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --mode)
+            MODE="$2"
+            shift 2
+        ;;
+    esac
+done
+
+# 根据模式设置不同的包名
+case $MODE in
+    uat)
+        APP_PACKAGE="com.xxx.xxx.xxx"
+        APPLICATION_NAME="Test_v0.0.1"
+        REMOTE_PATH="/sdcard/Android/data/$APP_PACKAGE/files/zipapp/1000001/application/$APPLICATION_NAME"
+        echo "使用UAT模式配置"
+    ;;
+    production)
+        APP_PACKAGE="com.yyy.yyy.yyy"
+        APPLICATION_NAME="Test_v0.0.1"
+        REMOTE_PATH="/sdcard/Android/data/$APP_PACKAGE/files/zipapp/1000001/application/$APPLICATION_NAME"
+        echo "使用生产模式配置"
+    ;;
+esac
+
+# 检查ADB是否安装
+echo "🔍 检查ADB环境..."
+if ! command -v adb &> /dev/null; then
+    echo "❌ ADB未安装或不在PATH中，请先安装Android SDK Platform Tools"
+    exit 1
+fi
+
+# 检查ADB连接状态
+echo "📱 检查设备连接..."
+DEVICE_COUNT=$(adb devices | grep -c "device$")
+
+if [ "$DEVICE_COUNT" -eq 0 ]; then
+    echo "❌ 没有检测到已连接的设备"
+    echo "请确保："
+    echo "  1. 设备已通过USB线或无线连接到电脑"
+    echo "  2. 设备已开启开发者选项和USB调试"
+    echo "  3. 已授权该电脑进行调试"
+    echo ""
+    echo "当前ADB状态："
+    adb devices
+    exit 1
+    elif [ "$DEVICE_COUNT" -gt 1 ]; then
+    echo "⚠️  检测到多个设备，将使用第一个设备"
+    echo "当前连接的设备："
+    adb devices
+    echo ""
+fi
+
+# 显示连接的设备信息
+DEVICE_INFO=$(adb devices | grep "device$" | head -n 1)
+echo "✅ 设备已连接: $DEVICE_INFO"
+
+echo "🧹 清理远程目录..."
+MSYS_NO_PATHCONV=1 adb shell "rm -rf '$REMOTE_PATH'/*"
+
+if [ $? -ne 0 ]; then
+    echo "❌ 清理远程目录失败，请检查路径权限"
+    exit 1
+fi
+
+echo "📤 推送文件到设备..."
+MSYS_NO_PATHCONV=1 adb push dist/* "$REMOTE_PATH"
+
+if [ $? -ne 0 ]; then
+    echo "❌ 文件推送失败"
+    exit 1
+fi
+
+FILE_COUNT=$(MSYS_NO_PATHCONV=1 adb shell "ls '$REMOTE_PATH' | wc -l" 2>/dev/null)
+echo "✅ 部署完成！成功推送了 $FILE_COUNT 个文件/目录"
+```
+
+## 运行脚本
+
+```bash
+npm run adb:uat # 推送到uat环境的Test_v0.0.1
+
+npm run adb:production # 推送到生产环境环境的$APPLICATION_NAME文件夹下
+```
