@@ -1,0 +1,404 @@
+---
+title: 微信小程序封装日历组件
+date: 2025/10/14 15:52:04
+tag: 微信小程序
+description: 封装一个微信小程序的日历组件，接收传入的日期，动态生成当月的日历信息，渲染完成后信息回传父页面
+---
+
+## 需求
+
+- 工作需要需要封装一个小程序的日历组件（直接在页面上显示，而非弹出的日期选择组件）
+- 日历有不同的样式，要在不同的页面复用
+- 小程序没有作用域插槽，但是需要把组件生成好的日历数据二次修改，再传给日历组件
+
+## 组件代码
+
+- 分为了封装的日历组件和日历组件的日期单元格
+
+### 日历组件
+
+```html
+<view class="calendar-container">
+  <view class="weekdays">
+    <view class="weekday" wx:for="{{weekdays}}" wx:key="index">{{item}}</view>
+  </view>
+
+  <view class="calendar-grid">
+    <CalendarCell
+      class="calendar-cell"
+      externalClass="{{cellClass}}"
+      wx:for="{{calendarDates}}"
+      wx:key="index"
+      isOtherMonth="{{item.isOtherMonth}}"
+      isToday="{{item.isToday}}"
+      item="{{item}}"
+      bind:tap="onCalendarCellClick"
+      data-item="{{item}}"
+    ></CalendarCell>
+  </view>
+</view>
+```
+
+```js
+import dayjs from '../../../utils/dayjs.min'
+
+Component({
+  properties: {
+    // YYYY-MM
+    date: {
+      type: String,
+      value: '2025-09',
+      observer(newVal) {
+        this.getCalendarDays(newVal)
+      },
+    },
+
+    cellClass: {
+      type: String,
+      // value: "primary",
+      value: 'plain',
+    },
+
+    calendarDates: {
+      type: Array,
+      value: [],
+    },
+  },
+
+  data: {
+    weekdays: ['一', '二', '三', '四', '五', '六', '日'],
+  },
+
+  lifetimes: {
+    attached() {
+      const { date } = this.data
+
+      this.getCalendarDays(date)
+    },
+  },
+
+  methods: {
+    getCalendarDays(date) {
+      const firstDay = dayjs(`${date}-01`)
+      const lastDay = firstDay.endOf('month')
+      const currentYear = firstDay.year()
+      const currentMonth = firstDay.month() + 1
+
+      // 获取第一天是星期几（调整为周一开始，0=周一，6=周日）
+      const firstDayWeek = (firstDay.day() + 6) % 7
+
+      // 获取当月天数
+      const daysInMonth = lastDay.date()
+
+      const calendarDays = []
+
+      // 添加上个月的日期
+      const prevMonth = firstDay.subtract(1, 'month')
+      const prevMonthDays = prevMonth.endOf('month').date()
+
+      for (let i = firstDayWeek - 1; i >= 0; i--) {
+        const day = prevMonthDays - i
+        calendarDays.push({
+          day,
+          isOtherMonth: true,
+          isToday: false,
+          dateStr: null,
+        })
+      }
+
+      // 添加当月的日期
+      for (let day = 1; day <= daysInMonth; day++) {
+        const currentDate = dayjs(`${currentYear}-${currentMonth}-${day}`)
+        const dateStr = currentDate.format('YYYY-MM-DD')
+
+        // 使用 dayjs 判断是否是今天
+        const isToday = currentDate.isSame(dayjs(), 'day')
+
+        calendarDays.push({
+          day,
+          isOtherMonth: false,
+          isToday,
+          dateStr,
+        })
+      }
+
+      // 添加下个月的日期
+      const remainingCells = 7 - (calendarDays.length % 7)
+      if (remainingCells < 7) {
+        // 只有当不足一行时才添加
+        for (let day = 1, i = 0; i < remainingCells; i++, day++) {
+          calendarDays.push({
+            day,
+            isOtherMonth: true,
+            isToday: false,
+            dateStr: null,
+          })
+        }
+      }
+
+      this.triggerEvent('update:calendarDates', { value: calendarDays })
+    },
+
+    onCalendarCellClick(e) {
+      const { item } = e.currentTarget.dataset
+
+      this.triggerEvent('calendarCellClick', { value: item })
+    },
+  },
+})
+```
+
+```scss
+.calendar-container {
+  padding: 40rpx 0 24rpx;
+  background: #fff;
+  border-radius: 24rpx;
+  overflow: hidden;
+
+  .weekdays {
+    display: flex;
+
+    .weekday {
+      flex: 1;
+      width: 24rpx;
+      height: 40rpx;
+      flex-shrink: 0;
+      color: #00000066;
+      text-align: center;
+      font-family: 'MiSans';
+      font-size: 24rpx;
+      font-style: normal;
+      font-weight: 400;
+      line-height: 40rpx;
+    }
+  }
+
+  .calendar-grid {
+    margin-top: 24rpx;
+    display: flex;
+    flex-wrap: wrap;
+    background: #fff;
+
+    .calendar-cell {
+      width: calc(100% / 7);
+    }
+  }
+}
+```
+
+### 日历日期单元格组件
+
+```html
+<view
+  class="date-cell {{isOtherMonth ? 'other-month' : ''}} {{isToday ? 'today' : ''}} {{externalClass}} {{item.isActive ? 'active' : ''}}"
+  style="--type-color2: {{item.bgColor || '#f1f1f1'}};"
+  bind:tap="onDateClick"
+>
+  <view class="primary-container">
+    <text class="date-number">{{item.day}}</text>
+    <!-- <text wx:if="{{externalClass === 'primary' && true}}" class="date-desc">上岗8</text> -->
+    <text wx:if="{{externalClass === 'primary'}}" class="date-desc">{{item.label || ' '}}</text>
+    <view class="status-dot" style="--type-color: {{item.dotColor}};"></view>
+  </view>
+</view>
+```
+
+```js
+Component({
+  // externalClasses: ["calendar-cell-class"],
+
+  properties: {
+    isOtherMonth: {
+      type: Boolean,
+      value: false,
+    },
+    isToday: {
+      type: Boolean,
+      value: false,
+    },
+    item: {
+      type: Object,
+    },
+
+    externalClass: {
+      type: String,
+    },
+  },
+
+  methods: {
+    onDateClick(e) {
+      const { item } = this.data
+
+      this.triggerEvent('date-click', item)
+    },
+  },
+})
+```
+
+```scss
+// 统计页面的日历样式
+.date-cell.plain {
+  padding: 24rpx 0;
+  width: 100%;
+  height: 60rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+
+  &.other-month {
+    .date-number {
+      color: #ddd;
+    }
+  }
+
+  &.today {
+    .date-number {
+      width: 40rpx;
+      background-color: #01b5c3 !important;
+      border-radius: 50%;
+      color: #fff;
+    }
+  }
+
+  &.today,
+  &.active {
+    .date-number {
+      width: 40rpx;
+      background-color: #01b5c3 !important;
+      border-radius: 50%;
+      color: #fff;
+    }
+  }
+
+  .date-number {
+    display: flex;
+    width: 32rpx;
+    height: 40rpx;
+    flex-direction: column;
+    justify-content: center;
+    flex-shrink: 0;
+    color: #000000;
+    text-align: center;
+    font-family: 'MiSans';
+    font-size: 24rpx;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 40rpx;
+  }
+
+  .status-dot {
+    margin-top: 12rpx;
+    position: absolute;
+    bottom: 16rpx;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 8rpx;
+    height: 8rpx;
+    border-radius: 50%;
+    background-color: var(--type-color, red);
+  }
+}
+
+// 排班日历页面的日历样式
+.date-cell.primary {
+  box-sizing: border-box;
+  padding: 4rpx;
+  position: relative;
+  width: 100%;
+  height: 124rpx;
+  background-color: #f9f9f9;
+
+  .primary-container {
+    height: 100%;
+    display: flex;
+    justify-content: flex-start;
+    flex-direction: column;
+    align-items: center;
+    background-color: var(--type-color2, #f1f1f1);
+  }
+
+  &.today {
+    .primary-container {
+      background-color: #01b5c3 !important;
+    }
+
+    .date-number {
+      color: #ffffffe6;
+
+      &::before {
+        content: '0';
+        color: transparent;
+      }
+    }
+
+    .date-desc {
+      color: #ffffff;
+    }
+  }
+
+  &.other-month {
+    .primary-container {
+      background-color: #fafafa !important;
+    }
+
+    .date-number {
+      color: #0000004d;
+    }
+
+    .date-desc {
+      color: transparent;
+    }
+  }
+
+  .date-number {
+    color: #000000e6;
+    text-align: center;
+    font-family: 'MiSans';
+    font-size: 24rpx;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 40rpx;
+  }
+
+  .date-desc {
+    color: #191919;
+    text-align: center;
+    font-family: 'MiSans';
+    font-size: 24rpx;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 40rpx;
+
+    &::before {
+      content: '0';
+      color: transparent;
+    }
+  }
+
+  .status-dot {
+    margin-top: 21rpx;
+    width: 10rpx;
+    height: 10rpx;
+    border-radius: 50%;
+    background-color: var(--type-color, #01b5c3);
+  }
+}
+```
+
+## 组件解析
+
+### 日历组件
+
+日历组件的主要逻辑都在 `getCalendarDays` 方法中，该方法会根据传入的参数 `date` 来生成日历的日期数据，填充 `上月` `本月` `下月` 的数据，并通过 triggerEvent 方法将数据通过自定义事件 `update:calendarDates` 发送给父组件，父组件在`bind:update:calendarDates`后二次修改日历组件的数据
+
+### 日历日期单元格组件
+
+日历日期单元格组件通过渲染日历父组件循环的 `calendarDates` 数据，根据实际需求可以在日历日期单元格组件中添加多种自定义样式，按需修改外部传入的单元格数据配置即可。
+
+## 实际效果
+
+![样式1](https://image.084612.xyz/20251014160456189.png)
+
+![样式2](https://image.084612.xyz/20251014161212187.png)
