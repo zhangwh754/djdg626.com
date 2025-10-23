@@ -1,0 +1,247 @@
+---
+title: 微信小程序长列表项懒加载组件
+date: 2025/10/23 17:21:01
+tag: 微信小程序,性能优化
+description: 解决微信小程序滚动加载的列表 在数据项增多后 因为Dom元素过多导致页面白屏崩溃的问题
+---
+
+## 代码
+
+```html
+<view class="list-item" id="list-item-{{itemId}}" style="min-height: {{height}}px;">
+  <block wx:if="{{showSlot}}">
+    <slot></slot>
+  </block>
+</view>
+```
+
+```js
+// components/skeleton.js
+import { getSystemInfo } from '../../../utils/getSystemInfo'
+
+Component({
+  /**
+   * 组件的属性列表
+   */
+  properties: {
+    // 可视区域倍数，默认上下各2屏
+    viewportMultiple: {
+      type: Number,
+      value: 2,
+    },
+  },
+
+  /**
+   * 组件的初始数据
+   */
+  data: {
+    height: 0, // 卡片高度，用来做外部懒加载的占位
+    showSlot: true,
+    itemId: '',
+  },
+
+  created() {
+    // 设置一个不走setData的数据池
+    this.extData = {
+      listItemContainer: null,
+      hasRecordedHeight: false, // 标记是否已记录高度
+      isFirstRender: true, // 标记是否首次渲染
+    }
+  },
+
+  detached() {
+    // 优化清理逻辑
+    if (this.extData?.listItemContainer) {
+      try {
+        this.extData.listItemContainer.disconnect()
+      } catch (error) {
+        console.error('Observer disconnect error:', error)
+      } finally {
+        this.extData = null
+      }
+    }
+  },
+
+  ready() {
+    // 生成更安全的唯一ID
+    this.setData({
+      itemId: this.generateUniqueId(),
+    })
+
+    wx.nextTick(() => {
+      // 首先获取元素高度
+      this.recordHeight(() => {
+        // 高度记录完成后，再创建observer
+        this.createObserver()
+      })
+    })
+  },
+
+  /**
+   * 组件的方法列表
+   */
+  methods: {
+    /**
+     * 记录元素高度
+     */
+    recordHeight(callback) {
+      const query = this.createSelectorQuery()
+      query.select(`#list-item-${this.data.itemId}`).boundingClientRect()
+      query.exec(res => {
+        if (res && res[0] && res[0].height) {
+          this.setData({
+            height: res[0].height,
+          })
+          this.extData.hasRecordedHeight = true
+          // console.log("【记录高度】", this.data.itemId, res[0].height);
+        }
+        callback && callback()
+      })
+    },
+
+    /**
+     * 创建 IntersectionObserver
+     */
+    createObserver() {
+      // 获取安全窗口高度
+      let info = getSystemInfo()
+      let { safeHeight: windowHeight = 667 } = info
+      const showNum = this.properties.viewportMultiple
+
+      try {
+        this.extData.listItemContainer = this.createIntersectionObserver()
+        this.extData.listItemContainer
+          .relativeToViewport({
+            top: showNum * windowHeight,
+            bottom: showNum * windowHeight,
+          })
+          .observe(`#list-item-${this.data.itemId}`, res => {
+            this.handleIntersection(res)
+          })
+      } catch (error) {
+        // console.error("Observer creation error:", error);
+        // 如果observer创建失败，默认显示内容
+        this.setData({ showSlot: true })
+      }
+    },
+
+    /**
+     * 处理交叉观察回调
+     */
+    handleIntersection(res) {
+      const { intersectionRatio, boundingClientRect } = res
+
+      // 只在状态真正改变时才 setData
+      if (intersectionRatio === 0) {
+        // 离开可视区域
+        if (this.data.showSlot) {
+          // console.log("【卸载】", this.data.itemId, "超过预定范围，从页面卸载");
+          this.setData({
+            showSlot: false,
+          })
+        }
+      } else {
+        // 进入可视区域
+        if (!this.data.showSlot) {
+          // console.log("【进入】", this.data.itemId, "达到预定范围，渲染进页面");
+
+          const updateData = { showSlot: true }
+
+          // 如果之前没记录过高度，现在记录
+          if (!this.extData.hasRecordedHeight && boundingClientRect && boundingClientRect.height) {
+            updateData.height = boundingClientRect.height
+            this.extData.hasRecordedHeight = true
+            // console.log(
+            //   "【补充记录高度】",
+            //   this.data.itemId,
+            //   boundingClientRect.height
+            // );
+          }
+
+          this.setData(updateData)
+        }
+      }
+
+      // 标记已完成首次渲染
+      if (this.extData.isFirstRender) {
+        this.extData.isFirstRender = false
+      }
+    },
+
+    /**
+     * 生成更安全的唯一ID
+     */
+    generateUniqueId() {
+      const timestamp = Date.now().toString(36)
+      const randomStr = Math.random().toString(36).slice(2, 11)
+      return `${timestamp}_${randomStr}`
+    },
+  },
+})
+```
+
+```js
+// getSystemInfo.js
+
+/**
+ * @description: 获取系统信息
+ */
+export const getSystemInfo = () => {
+  const result = wx.getSystemInfoSync()
+
+  let res = {
+    bottomSafeHeight: 0,
+    navigationBarHeight: 0,
+    statusBarHeight: 0,
+    dpr: 1,
+    safeHeight: 0,
+  }
+
+  // 是否是ios
+  const ios = !!(result.system.toLowerCase().search('ios') + 1)
+
+  // ios下weui navigation-bar高度44px,不是ios48px
+  res.navigationBarHeight = ios ? 44 : 48
+
+  // 设备像素比
+  res.dpr = result.pixelRatio
+
+  // 状态栏高度
+  const statusBarHeight = result.statusBarHeight
+  res.statusBarHeight = statusBarHeight
+
+  // 安全区域
+  const safeArea = result.safeArea
+  // 可视区域高度 - 适配横竖屏场景
+  const screenHeight = Math.max(result.screenHeight, result.screenWidth)
+  const height = Math.max(safeArea.height, safeArea.width)
+  // 获取底部安全区域高度（全面屏手机）
+  if (safeArea && height && screenHeight) {
+    const bottomSafeHeight = screenHeight - height - statusBarHeight
+    res.bottomSafeHeight = bottomSafeHeight < 0 ? 0 : bottomSafeHeight
+  }
+
+  // 真实可用高度
+  res.safeHeight = result.screenHeight - res.navigationBarHeight - statusBarHeight - res.bottomSafeHeight
+  // 真实可用宽度
+  res.safeWidth = result.screenWidth
+
+  return res
+}
+```
+
+## 使用方法
+
+```html
+<view wx:for="{{list}}" wx:key="key">
+  <LazyItem>
+    <ApplyItem
+      isAdmin="{{true}}"
+      item="{{item}}"
+      data-item="{{item}}"
+      bind:deny="onDeny"
+      bind:agree="onAgree"
+    ></ApplyItem>
+  </LazyItem>
+</view>
+```
