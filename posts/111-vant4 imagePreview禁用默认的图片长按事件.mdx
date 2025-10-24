@@ -1,0 +1,39 @@
+---
+title: vant4 imagePreview禁用默认的图片长按事件
+date: 2025/10/24 13:05:48
+tag: vue,vant,css
+description: 使用css的pointer-events属性，禁用vant-imagePreview组件的图片长按事件
+---
+
+## 问题描述
+
+处于项目需要，需要禁用有版权的图片的长按事件（长按保存），但是 vant4 的 imagePreview 组件没有提供禁用长按事件的方法，只有监听长按事件发生的事件，所以通过 css 来禁用长按事件。
+
+```css showLineNumbers {6}
+:deep(.tab-content_info) {
+  .hide-download {
+    color: red;
+
+    img {
+      pointer-events: none !important;
+    }
+  }
+}
+```
+
+```js showLineNumbers {4}
+const imageConfig = {
+  showIndex: false,
+  images: [$fileList.value[currentIndex]].map(item => item.url || item.content),
+  className: props.isDownload ? '' : 'hide-download',
+  teleport: '.tab-content_info',
+}
+
+showImagePreview(imageConfig)
+```
+
+## 注意事项
+
+`ImagePreview` 组件默认使用了 `Teleport` 组件，必须把对应的 css 样式加载到 `teleport` 组件的 `to` 属性指定的元素组件中，否则样式不会生效。
+
+当使用 Vue 的 Teleport 将组件内容传送到外部 DOM 节点后，父组件的 scoped CSS 样式对 Teleport 的内容不会生效。原因 Vue 的 scoped CSS 通过给组件的根元素和样式选择器添加唯一的 data 属性（如 data-v-xxxx）来实现样式隔离。但 Teleport 的内容被传送到了组件树之外的 DOM 位置，虽然这些元素仍会保留 data-v-xxxx 属性，但它们脱离了父组件的 DOM 结构，父组件的 scoped 样式选择器无法正确匹配到它们。
