@@ -1,0 +1,38 @@
+---
+title: vue2引入html Mounted不触发
+date: 2025/11/13 16:17:25
+tag: vue
+description: 在html中引入vue.js进行开发，在Mounted生命周期中进行了操作，在页面回退后没有重新触发Mounted
+---
+
+## 具体问题
+
+多页面应用 引入了 vue.js，现在 a 页面跳转 b 页面，b 页面 history.back 后，a 页面的 Mounted 不触发
+
+## 解决方式
+
+利用监听 `pageshow` 事件
+
+```js
+$(
+  (function (window) {
+    const app = new Vue({
+      el: '#app',
+      data: {},
+      mounted() {
+        window.addEventListener('pageshow', this.foo)
+      },
+      beforeDestroy() {
+        window.removeEventListener('pageshow', this.foo)
+      },
+      methods: {
+        foo() {},
+      },
+    })
+  })(window)
+)
+```
+
+## 其他
+
+注意 vue 示例中不能使用 window，需要用 `IFFE` 主动传入 window 给 vue 内部使用。
