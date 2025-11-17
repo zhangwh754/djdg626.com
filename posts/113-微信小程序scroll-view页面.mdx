@@ -1,0 +1,75 @@
+---
+title: 微信小程序scroll-view页面
+date: 2025/11/17 13:21:38
+tag: 微信小程序
+description:
+---
+
+## 介绍
+
+构建一个垂直方向的包含 scroll-view 列表的页面，页面上有不定高的一块区域容纳 scroll-view，别的部分固定不滚动
+
+```scss
+page {
+  background-color: #f5f5f5;
+}
+
+.container {
+  box-sizing: border-box;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.user-info-container {
+  // ...
+}
+
+.account-list-container {
+  margin: 0 30rpx;
+  padding: 0 0 24rpx;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; // 禁用滚动
+
+  .account-list {
+    box-sizing: border-box;
+    margin-top: 24rpx;
+    height: 0; // 设置高度
+    flex: 1;
+    width: 694rpx;
+    background-color: #f5f5f5;
+
+    .list-item {
+      margin: 20rpx 0;
+
+      &:nth-of-type(1) {
+        margin-top: 0;
+      }
+    }
+  }
+}
+
+.bottom-btn-container {
+  padding: 20rpx 30rpx;
+  background-color: #fff;
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
+
+  .submit-btn {
+    height: 88rpx;
+    line-height: 88rpx;
+    text-align: center;
+    background-color: #02a39b;
+    color: #fff;
+    font-size: 32rpx;
+    border-radius: 44rpx;
+  }
+}
+```
+
+## 其他
+
+高度不足 不应该出现滚动条
