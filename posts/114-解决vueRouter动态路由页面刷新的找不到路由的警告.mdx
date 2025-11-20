@@ -1,0 +1,77 @@
+---
+title: 解决vueRouter动态路由页面刷新的找不到路由的警告
+date: 2025/11/20 15:26:48
+tag: vue
+description:
+---
+
+## 问题描述
+
+vue 开发后台管理系统，使用了动态路由添加路由
+
+正常使用页面没有问题，但是在页面 f5 刷新后，控制台会先出现一条警告
+
+![vue router warn](https://image.084612.xyz/20251120153500624.png)
+
+## 问题代码
+
+原逻辑通过 isInitAuthRoute 变量判断是否初始化过动态路由
+
+在路由守卫中进行动态挂载路由
+
+```js
+export const setupRouterGuard = router => {
+  const routeStore = useRouteStore()
+
+  router.beforeEach(async (to, from, next) => {
+    // 判断路由有无进行初始化
+    if (!routeStore.isInitAuthRoute) {
+      await routeStore.initAuthRoute()
+
+      // 动态路由加载完回到目标路由
+      return next({
+        ...to,
+        replace: true,
+      })
+    }
+
+    next()
+  })
+}
+```
+
+## 修复后的代码
+
+不再路由守卫中进行动态路由挂载，而是在`登录完成后`和`installRouter前`两个地方挂载动态路由
+
+```js showLineNumbers {14,15,16}
+async function setUpApp() {
+  const app = createApp(App)
+
+  await installStore(app)
+  await installRouter(app)
+
+  app.mount('#app')
+}
+
+export async function installRouter(app) {
+  const routeStore = useRouteStore()
+
+  // 判断路由有无进行初始化
+  if (!routeStore.isInitAuthRoute) {
+    await routeStore.initAuthRoute()
+  }
+
+  // 添加路由守卫
+  setupRouterGuard(router)
+
+  app.use(router)
+
+  // 初始化路由和路由守卫完成解析
+  await router.isReady() // https://router.vuejs.org/zh/api/interfaces/Router.html#Methods-isReady
+
+  console.log('install router success.')
+}
+
+setUpApp()
+```
