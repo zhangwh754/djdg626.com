@@ -1,0 +1,88 @@
+---
+title: 区分 ui组件、业务组件、业务页面
+date: 2025/11/25 16:26:32
+tag: 前端架构
+description: 个人对于ui组件、业务组件、业务页面的理解
+---
+
+## ui 组件、业务组件、业务页面的概念
+
+1. UI 组件：跨项目也能使用的标准组件
+2. 业务组件：利用 UI 组件拼装的特定部分，跨项目不可使用，但是一个项目可以使用多次
+3. 业务页面：包含了业务组件，代表了一个完整的业务场景
+
+## ui 组件、业务组件、业务页面的对比
+
+| 特性       | ui 组件        | 业务组件     | 业务页面        |
+| ---------- | -------------- | ------------ | --------------- |
+| 数据来源   | 仅使用 props   | props+store  | props+store+api |
+| 对外通信   | emit           | emit/store   | store           |
+| 代码复用性 | 跨项目复用     | 项目内复用   | 不复用          |
+| 业务       | 与业务无关     | 业务相关     | 业务相关        |
+| 常见示例   | Navbar、Search | 表单筛选部分 | 详情页          |
+
+## 代码结构
+
+### 小型项目
+
+```text
+src/
+├── components/           # 全局组件
+│   ├── ui/               # [UI 组件]：通用的、无关业务的
+│   │   ├── BaseButton.vue
+│   │   ├── BaseCard.vue
+│   │   └── AppInput.vue
+│   │
+│   └── business/         # [业务组件]：项目特定的复用块
+│       ├── UserAvatar.vue     # 依赖了 UserStore
+│       ├── ProductCard.vue    # 依赖了 Product 类型定义
+│       └── CartWidget.vue
+│
+├── views/                # [业务页面]：路由组件
+│   ├── HomeView.vue
+│   ├── LoginView.vue
+│   └── product/
+│       ├── ProductList.vue
+│       └── ProductDetail.vue
+│
+├── composables/          # 逻辑复用 (Hooks)
+├── stores/               # 状态管理 (Pinia)
+└── router/               # 路由定义
+```
+
+### 大型项目
+
+```text
+src/
+├── components/           # [UI 组件] 只有纯 UI 组件放这里
+│   ├── BaseButton.vue
+│   └── BaseModal.vue
+│
+├── modules/              # 按业务领域划分
+│   ├── user/
+│   │   ├── components/   # [业务组件] 属于 User 模块的组件
+│   │   │   ├── UserProfileCard.vue
+│   │   │   └── UserSettingsForm.vue
+│   │   ├── pages/        # [业务页面] User 相关的页面
+│   │   │   ├── Login.vue
+│   │   │   └── Profile.vue
+│   │   └── store.ts      # User 相关的 Pinia store
+│   │
+│   └── order/
+│       ├── components/
+│       │   └── CartList.vue
+│       └── pages/
+│           └── Checkout.vue
+```
+
+## 组件开发时的单向数据流原则
+
+组件开发时应遵守单向数据流原则
+
+1. 在`业务页面`负责数据的获取，读取 URL 参数、调用 API 获取数据，把数据分发给业务组件
+2. 在`业务组件`处理特定的业务逻辑
+   - 可以接受 props
+   - 可以从 store 获取数据
+   - 可以从 composition api 调用封装好的逻辑，这个状态不存入 store
+   - 可以从 store 调用封装好的 api，可以存入 store
+3. `ui组件` 只负责`接收props`、`视图render` 以及 `emits`
