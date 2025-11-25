@@ -1,0 +1,44 @@
+---
+title: vue3高阶组件和jsx
+date: 2025/11/25 15:40:22
+tag: vue
+description: 在vue3项目中使用jsx拓展组件的封装自由度
+---
+
+## 需求
+
+现在要封装一个列表，原需求可能是 ul 作为根，现在要动态切换为 ol 或 div，使用纯模板较难实现
+
+```vue
+<script setup>
+import { h, useAttrs, useSlots } from 'vue'
+
+const props = defineProps({
+  tag: {
+    type: String,
+    default: 'li',
+  },
+})
+
+const attrs = useAttrs()
+
+const slot = useSlots()
+
+const ListContainer = () => h(props.tag, attrs, slot.default())
+</script>
+
+<template>
+  <ListContainer></ListContainer>
+  <!-- <ul>
+    <slot></slot>
+   </ul> -->
+</template>
+```
+
+```html
+<ListContainer :tag="tagType">
+  <li v-for="item in 3" :key="item">
+    <img class="image" width="50" height="50" src="https://images.dog.ceo/breeds/brabancon/n02112706_292.jpg" alt="" />
+  </li>
+</ListContainer>
+```
