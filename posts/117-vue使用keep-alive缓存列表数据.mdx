@@ -1,0 +1,159 @@
+---
+title: vue使用keep-alive缓存列表数据
+date: 2025/12/01 23:17:39
+tag: vue
+description:
+---
+
+## 基础概念
+
+### 组件的 name 和路由的 name 的区别
+
+- 组件的 name 用于 keep-alive 的 include 和 exclude
+- 路由的 name 用于路由守卫 to/from 的 name
+
+## 业务场景
+
+1. 列表页有缓存
+2. 列表页前往详情页命中缓存
+3. 退出列表页 删除缓存
+
+## 具体实现
+
+1. pinia 创建一个 routeStore
+
+```js
+import { ref, computed } from 'vue'
+import { defineStore } from 'pinia'
+
+export const useRouteStore = defineStore('route-store', () => {
+  // 使用 Set 存储缓存的路由名称（避免重复）
+  const cacheRouteSet = ref(new Set())
+
+  // 转换为数组供 keep-alive 使用
+  const cachedViews = computed(() => Array.from(cacheRouteSet.value))
+
+  /**
+   * 添加路由到缓存
+   * @param {string} routeName - 路由名称
+   */
+  const addCache = routeName => {
+    if (routeName) {
+      cacheRouteSet.value.add(routeName)
+    }
+  }
+
+  /**
+   * 从缓存中移除路由
+   * @param {string} routeName - 路由名称
+   */
+  const removeCache = routeName => {
+    if (routeName) {
+      cacheRouteSet.value.delete(routeName)
+
+      console.log({
+        type: 'removeCache',
+        routeName,
+      })
+    }
+  }
+
+  /**
+   * 清空所有缓存
+   */
+  const clearCache = () => {
+    cacheRouteSet.value.clear()
+  }
+
+  /**
+   * 检查路由是否在缓存中
+   * @param {string} routeName - 路由名称
+   * @returns {boolean}
+   */
+  const hasCache = routeName => {
+    return cacheRouteSet.value.has(routeName)
+  }
+
+  return {
+    // 状态
+    cacheRouteSet,
+    cachedViews,
+
+    // 方法
+    addCache,
+    removeCache,
+    clearCache,
+    hasCache,
+  }
+})
+```
+
+2. App.vue 中使用 routeStore 管理的缓存路由
+
+```html
+<router-view v-slot="{ Component, route }">
+  <keep-alive :include="routeStore.cachedViews">
+    <component :is="Component" :key="route.name" v-if="route.meta.keepAlive" />
+  </keep-alive>
+
+  <component :is="Component" :key="route.name" v-if="!route.meta.keepAlive" />
+</router-view>
+```
+
+```js
+;[
+  {
+    ath: '/approver/list',
+    component: () => import('@/views/Approver/List.vue'),
+    meta: {
+      keepAlive: true,
+    },
+  },
+]
+```
+
+3. 列表页在 onBeforeRouteLeave 中处理缓存
+
+```js
+const routeStore = useRouteStore()
+onBeforeRouteLeave(to => {
+  // 前往详情页 - 缓存当前列表页
+  if (to.name === APPROVER_DETAIL_NAME) {
+    routeStore.addCache(APPROVER_LIST_NAME)
+  }
+  // 返回上一页 - 清除缓存
+  else {
+    routeStore.removeCache(APPROVER_LIST_NAME)
+  }
+})
+```
+
+## 缓存列表的高度-useSaveScroll
+
+```js
+import { ref, onActivated, onDeactivated, nextTick } from 'vue'
+import { useScroll } from '@vueuse/core'
+
+export default function useSaveScroll(scrollRef) {
+  const savedScrollTop = ref(0)
+  const { y } = useScroll(scrollRef, { behavior: 'smooth' })
+
+  // 父组件被缓存时，子组件的 deactivated 也会触发
+  onDeactivated(() => {
+    if (scrollRef.value) {
+      savedScrollTop.value = y.value
+    }
+  })
+
+  // 父组件被激活时，子组件的 activated 也会触发
+  onActivated(() => {
+    if (scrollRef.value && savedScrollTop.value > 0) {
+      nextTick(() => {
+        scrollRef.value.scrollTop = savedScrollTop.value
+      })
+    }
+  })
+
+  return { y, savedScrollTop }
+}
+```
