@@ -1,0 +1,42 @@
+---
+title: ts使用satisfies满足自动类型推导
+date: 2025/12/06 20:53:33
+tag: ts
+description: 使用 satisfies 让对象既能被约束、又不丢失自动推导能力
+---
+
+## 问题
+
+在 TypeScript 中，我们经常遇到这样一种情况：
+我们希望对象的 结构 必须满足某个类型（如函数签名、字段类型）
+但又希望 TypeScript 能够从对象 字面量本身推导出精确的 key 类型
+如果直接用 = 赋值给一个类型，TS 虽然能检查类型，但会 丢失 key 的 literal type 推导。
+
+```ts
+type Obj = {
+  [key: string]: (left: number, right: number) => number
+}
+
+const obj: Obj = {
+  '+': (left, right) => left + right,
+  '-': (left, right) => left + right,
+}
+
+type operator = keyof typeof obj // string
+```
+
+## 解决
+
+而这是 ts 4.9 引入的 satisfies 的最佳使用场景
+
+1. 对象符合一个结构
+2. 希望保留字面量自动推导能力
+
+```ts
+const obj = {
+  '+': (left, right) => left + right,
+  '-': (left, right) => left + right,
+} satisfies Record<string, (left: number, right: number) => number>
+
+type operator = keyof typeof obj // + | -
+```
