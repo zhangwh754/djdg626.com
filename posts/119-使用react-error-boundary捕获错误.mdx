@@ -1,0 +1,55 @@
+---
+title: 使用react-error-boundary捕获错误
+date: 2025/12/07 16:56:07
+tag: react
+description:
+---
+
+## 标题
+
+使用 react-error-boundary 捕获错误，避免整个应用白屏
+
+```tsx
+import { useEffect } from 'react'
+import { ErrorBoundary, type FallbackProps } from 'react-error-boundary'
+
+function ExampleApplication() {
+  return (
+    <>
+      {/* expect an error */}
+      <input type="date" value={new Date('xxxx').toISOString()} />
+    </>
+  )
+}
+
+function ErrorFallback(fallbackProps: FallbackProps) {
+  useEffect(() => {
+    console.log('错误上报', fallbackProps.error)
+  }, [fallbackProps.error])
+
+  return (
+    <>
+      <div style={{ border: '1px solid #000' }}>
+        <div>Something went wrong</div>
+        <div style={{ color: 'red' }}>{fallbackProps.error?.message}</div>
+      </div>
+    </>
+  )
+}
+
+function App() {
+  return (
+    <>
+      <div>Hello World</div>
+      <ErrorBoundary FallbackComponent={ErrorFallback}>
+        <ExampleApplication />
+      </ErrorBoundary>
+    </>
+  )
+}
+
+export default App
+```
+
+![错误边界处理](https://image.084612.xyz/20251207170834447.png)
+
