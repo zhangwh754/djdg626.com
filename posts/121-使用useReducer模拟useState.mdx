@@ -1,0 +1,86 @@
+---
+title: 使用useReducer模拟useState
+date: 2025/12/12 10:39:40
+tag: react
+description:
+---
+
+## 标题
+
+dispatch 函数的参数可以是部分 state 或者一个函数
+
+传入的值会自动解构一层
+
+函数支持可以多次调用 setState 避免使用过期的值
+
+```tsx
+import { useReducer, useState } from 'react'
+
+type State = {
+  count: number
+  name?: string
+  timestamp?: number
+}
+type Payload<T> = ((state: T) => T) | T | Partial<T>
+
+const countReducer = (state: State, payload: Payload<typeof state>) => {
+  if (typeof payload === 'function') {
+    const result = payload(state)
+    return { ...state, ...result }
+  } else {
+    return { ...state, ...payload }
+  }
+}
+
+export default function StateReducer() {
+  const [countState, setCount] = useReducer(countReducer, {
+    count: 0,
+    timestamp: Date.now(),
+  })
+
+  const add = (step: number) => {
+    setCount(preState => ({ count: preState.count + step }))
+    setCount(preState => ({ count: preState.count + step }))
+    setCount(preState => ({ count: preState.count + step }))
+  }
+  const add2 = (step: number) => {
+    setCount(preState => ({
+      count: preState.count + step,
+      timestamp: Date.now(),
+    }))
+  }
+  const sub = (step: number) => {
+    setCount(preState => ({ count: preState.count - step }))
+    setCount(preState => ({ count: preState.count - step }))
+    setCount(preState => ({ count: preState.count - step }))
+  }
+
+  const [step, setStep] = useState(1)
+
+  return (
+    <>
+      <label htmlFor="step">步长</label>
+      <input id="step" type="number" value={step} onChange={e => setStep(+e.target.value)} />
+
+      <div>{JSON.stringify(countState)}</div>
+
+      <button onClick={() => add(step)}>
+        <span>只加count</span>
+        <span>+</span>
+      </button>
+      <br />
+      <button onClick={() => add2(step)}>
+        <span>同时加count和时间戳</span>
+        <span>+</span>
+      </button>
+      <br />
+      <button onClick={() => sub(step)}>
+        <span>只-count</span>
+        <span>-</span>
+      </button>
+    </>
+  )
+}
+```
+
+![](https://image.084612.xyz/20251212104218466.png)
