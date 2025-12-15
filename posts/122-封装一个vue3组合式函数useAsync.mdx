@@ -1,0 +1,94 @@
+---
+title: 封装一个vue3组合式函数useAsync
+date: 2025/12/15 14:58:07
+tag: vue
+description: 封装一个获取异步数据的useAsync组合式函数
+---
+
+## 前言
+
+参考了 react 的 use hook 和 vue-hooks-plus 的 useRequest 组合式函数
+
+简单封装了 useAsync 组合式函数，支持异步请求、Promise 等
+
+## 代码
+
+```js
+import { ref, shallowRef, computed } from 'vue'
+
+const STATUS = {
+  INIT: 'idle',
+  PENDING: 'pending',
+  FULFILLED: 'fulfilled',
+  REJECTED: 'rejected',
+}
+
+export default function useAsync(promiseOrFn) {
+  const data = shallowRef(null)
+  const error = shallowRef(null)
+  const status = ref(STATUS.INIT)
+  const loading = computed(() => status.value === STATUS.PENDING)
+
+  const isFunction = typeof promiseOrFn === 'function'
+
+  let lastArgs = []
+
+  const run = async (...args) => {
+    status.value = STATUS.PENDING
+    error.value = null
+    lastArgs = args
+
+    try {
+      const result = isFunction ? await promiseOrFn(...args) : await promiseOrFn
+
+      data.value = result
+      status.value = STATUS.FULFILLED
+      return result
+    } catch (err) {
+      error.value = err
+      status.value = STATUS.REJECTED
+      throw err
+    }
+  }
+
+  const refresh = () => run(...lastArgs)
+
+  if (isFunction) {
+    run()
+  } else {
+    run()
+  }
+
+  return {
+    data,
+    error,
+    status,
+    loading,
+    run,
+    refresh,
+  }
+}
+```
+
+## 使用示例
+
+```js
+import useAsync from './useAsync.js'
+// const { data, loading, error, run, refresh } = use(testLocalApi, {})
+// const { data, loading, error, run, refresh } = use(testLocalApi({ a: 1 }), {})
+// const { data, loading, error, run, refresh } = use(() => testLocalApi({ b: 2 }), {})
+const { data, loading, error, run, refresh } = useAsync(
+  fetch('https://jsonplaceholder.typicode.com/todos/1').then(res => res.json()),
+  {}
+)
+```
+
+## 总结
+
+相比于 useRequest，增加了 status
+
+loading 状态无法标识 `success` 到 `error` 的这段状态
+
+具体见本视频：
+
+[https://egghead.io/lessons/react-use-a-status-enum-instead-of-booleans](使用 status_enum 来代替 loading booleans)
