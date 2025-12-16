@@ -1,0 +1,83 @@
+---
+title: 使用useRef解决react中的闭包陷阱
+date: 2025/12/16 23:05:36
+tag: react
+description: 使用useRef解决react中的闭包陷阱
+---
+
+## 闭包陷阱
+
+下方的 useEffect 的引用始终是初次渲染创建的 latestCount 的值
+
+再 setCount 触发后，count 会正常更新，但是定时器的打印会错误
+
+```jsx
+function Counter() {
+  const [count, setCount] = useState(0) // count = 0
+
+  let latestCount = count // ① latestCount₁ = 0（内存地址A）
+
+  useEffect(() => {
+    latestCount = count // ② ✅ 首次渲染会执行！latestCount₁ = 0
+  })
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      console.log('Latest count:', latestCount) // ③ 闭包捕获 latestCount₁，始终打印0
+    }, 1000)
+    return () => clearInterval(timer)
+  }, []) // ④ ✅ 首次渲染也会执行！
+
+  return (
+    <>
+      <h2>{count}</h2>
+      <button class onClick={() => setCount(1)}>
+        Click
+      </button>
+    </>
+  )
+}
+```
+
+## 解决闭包陷阱
+
+- `useRef` 返回的对象 `{ current: value }` 在整个组件生命周期内**引用不变**
+- 现在闭包捕获的是 `latestCountRef` 这个对象引用
+- 通过 `latestCountRef.current` 访问时，总是读取最新的值
+
+```tsx
+function Counter2() {
+  const [count, setCount] = useState(0)
+
+  let latestCountRef = (useRef < null) | (number > null)
+
+  useEffect(() => {
+    latestCountRef.current = count
+  })
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      console.log('Latest count2:', latestCountRef.current)
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  return (
+    <>
+      <h2>{count}</h2>
+      <button className="btn btn-primary" onClick={() => setCount(count + 1)}>
+        Click
+      </button>
+    </>
+  )
+}
+```
+
+![Counter和Counter2组件各点击三次](https://image.084612.xyz/20251216231704619.png)
+
+## useRef 的应用场景
+
+- 场景 1: 事件监听器
+- 场景 2: 定时器
+
+useRef 是 React 中处理回调函数依赖的最佳实践之一
