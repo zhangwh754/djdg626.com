@@ -1,0 +1,25 @@
+---
+title: windows杀死特定端口的进程
+date: 2025/12/28 18:36:17
+tag: windows
+description:
+---
+
+## 标题
+
+```bash
+# 找到
+netstat -ano | findstr :3001
+
+# TCP    0.0.0.0:3001           0.0.0.0:0              LISTENING       18004
+# TCP    [::]:3001              [::]:0                 LISTENING       18004
+# TCP    [::1]:2663             [::1]:3001             CLOSE_WAIT      2884
+# TCP    [::1]:3001             [::1]:2663             FIN_WAIT_2      18004
+# TCP    [::1]:3001             [::1]:3026             ESTABLISHED     18004
+# TCP    [::1]:3001             [::1]:8324             TIME_WAIT       0
+# TCP    [::1]:3026             [::1]:3001             ESTABLISHED     2884
+# TCP    [::1]:8323             [::1]:3001             TIME_WAIT       0
+
+# 18004是上面输出的最后一列
+taskkill //F //PID 18004
+```
