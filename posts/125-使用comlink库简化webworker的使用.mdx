@@ -1,0 +1,120 @@
+---
+title: 使用comlink库简化webworker的使用
+date: 2025/12/21 18:45:03
+tag: webworker,性能优化
+description: 在vite环境下，使用comlink库操作webworker
+---
+
+## 基础
+
+有一个长为 17000 的列表，现在做前端筛选时耗时很高，现在把计算过程放到 worker 中，使用 comlink 进行异步的计算
+
+## 代码
+
+```ts
+import { expose } from 'comlink'
+import localCities from './us-cities.json'
+
+type City = {
+  name: string
+  country: string
+}
+
+const cities = (localCities as City[]).map((city, cityIndex) => ({
+  id: String(cityIndex),
+  ...city,
+}))
+
+const citySearch = (keyWord: string) => {
+  if (!keyWord.trim()) return cities
+  const lowerKeyword = keyWord.toLowerCase()
+  return cities.filter(city => city.name.toLowerCase().includes(lowerKeyword))
+}
+
+const cityWorker = {
+  citySearch,
+}
+
+expose(cityWorker)
+
+export type CityWorker = typeof cityWorker
+```
+
+```ts
+import { wrap } from 'comlink'
+import { type CityWorker } from './city.worker'
+
+const worker = new Worker(new URL('./city.worker.ts', import.meta.url), {
+  type: 'module',
+})
+
+const cityUtils = wrap<CityWorker>(worker)
+
+export const citySearch = async (keyword: string) => {
+  return cityUtils.citySearch(keyword)
+}
+```
+
+使用：
+
+1. 包装了异步方法 citySearch
+2. use hook 获取异步数据
+3. 使用 useTransition 和 spin-delay 库控制 loading 状态
+
+```tsx
+import { Suspense, use, useState, useTransition } from 'react'
+import { useSpinDelay } from 'spin-delay'
+import { citySearch } from './cities'
+
+export default function () {
+  return (
+    <Suspense fallback="loading...">
+      <CityList></CityList>
+    </Suspense>
+  )
+}
+
+const initialCityPromise = citySearch('')
+function CityList() {
+  const [keyword, setKeyword] = useState('')
+  const [isTransition, startTransition] = useTransition()
+  const [cityPromise, setCityPromise] = useState(initialCityPromise)
+  const isPending = useSpinDelay(isTransition)
+
+  const cities = use(cityPromise)
+
+  return (
+    <>
+      <input
+        type="text"
+        value={keyword}
+        placeholder="Type here"
+        className="input"
+        onChange={e => {
+          const newSearch = e.currentTarget.value
+          setKeyword(newSearch)
+          startTransition(() => setCityPromise(citySearch(newSearch)))
+        }}
+      />
+
+      <ul
+        style={{ opacity: isPending ? 0.6 : 1 }}
+        className="list bg-base-100 rounded-box shadow-md h-[50vh] overflow-y-auto"
+      >
+        <li className="p-4 pb-2 text-xs opacity-60 tracking-wide">click to picker a region</li>
+
+        {cities.map(city => {
+          return (
+            <li key={city.id} className="list-row">
+              <div>
+                <div>{city.country}</div>
+                <div className="text-xs uppercase font-semibold opacity-60">{city.name}</div>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </>
+  )
+}
+```
