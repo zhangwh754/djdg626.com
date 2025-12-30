@@ -1,0 +1,74 @@
+---
+title: react路由懒加载导致组件意外的多次渲染
+date: 2025/12/30 22:51:23
+tag: react
+description: 在react-router中通过lazy懒加载组件，layout意外的多次渲染
+---
+
+## 问题
+
+有一个 layout 组件，内部用`Outlet`渲染了`Home`和`Article`两个组件
+预期是 NotesLayout 只渲染一次 但是实际上 NotesLayout 组件渲染了 3 次（通过打印）
+
+```ts
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <NotesLayout />,
+    children: [
+      {
+        index: true,
+        element: <Home children={'首页'} />,
+      },
+      {
+        path: 'detail/:id',
+        element: <Article />,
+      },
+    ],
+  },
+])
+```
+
+## 问题排查
+
+通过降低了 react-router 的版本；修改了 react-router 路由的配置方式，增加了 memo；去除了`babel-plugin-react-compiler`等都没有解决
+
+最后通过新创建了一个最小复现 demo 后发现 是 Home 和 Article 两个懒加载组件导致的问题
+
+## 问题解决
+
+在 Layout 内部的 Outlet 外部再包裹一层 Suspense 即可
+
+有 Suspense，NotesLayout 只打印一次
+没有 Suspense，NotesLayout 会多次打印
+
+```tsx showLineNumbers {14,16}
+export function NotesLayout() {
+  console.log('NotesLayout')
+
+  return (
+    <div className="flex h-full overflow-hidden">
+      {/* 左侧边栏 - 类型导航 */}
+      <Navigation />
+
+      {/* 中间栏 - 笔记列表 */}
+      <MiddleNav />
+
+      {/* 右侧主内容区 - 笔记详情 */}
+      <main className="flex-1 bg-light overflow-auto scroll-bar">
+        <Suspense fallback={<NotesSkeleton />}>
+          <Outlet />
+        </Suspense>
+      </main>
+    </div>
+  )
+}
+```
+
+## 总结
+
+出现这个问题的原因是
+
+React Router 在处理懒加载组件时，如果没有在合适的位置放置 Suspense 边界，会导致父组件在子组件加载过程中多次渲染
+
+React 懒加载最佳实践是在外层包裹 `Suspense`
