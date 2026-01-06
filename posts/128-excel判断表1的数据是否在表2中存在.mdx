@@ -1,0 +1,19 @@
+---
+title: excel判断表1的数据是否在表2中存在
+date: 2026/01/06 14:01:01
+tag: excel
+description:
+---
+
+## LSS
+
+1. 单元格输入公式
+2. 自动弹出文件选择器，选择另一个表格
+3. 往下拖拽公式列单元格
+
+```excel
+=IF(COUNTIF([w_login_role.xlsx]w_login_role!B:B,B2)>0,"存在","不存在")
+```
+
+这个公式表示，在【表 2.xlsx 的 Sheet1 的 B 列】中统计【等于 当前表 B2 的值】的数量
+往下拖拽即搜索每一行的 Bx 是否在另一张表中存在
