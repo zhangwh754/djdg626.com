@@ -1,0 +1,91 @@
+---
+title: 几种js实现的排序
+date: 2026/01/06 19:33:33
+tag: 算法,js
+description: 选择排序、
+---
+
+## 选择排序-Selection Sort
+
+1. 选择排序的核心:在未排序部分找最小值,与当前位置交换
+2. 原地排序:直接在原数组上修改,不创建新数组
+
+优化点：最外层 for 循环只渲染到 `len-1` 次，最后一个元素已经是最大值了 无需比较
+
+```js
+export default function selectionSort(arr) {
+  if (arr.length === 0) throw new Error()
+
+  const len = arr.length
+
+  for (let i = 0; i < len - 1; i++) {
+    let minIndex = i
+
+    for (let n = i + 1; n < len; n++) {
+      if (arr[minIndex] > arr[n]) {
+        minIndex = n
+      }
+    }
+
+    if (minIndex !== i) {
+      ;[arr[minIndex], arr[i]] = [arr[i], arr[minIndex]]
+    }
+  }
+
+  return arr
+}
+```
+
+## 冒泡排序--Bubble Sort
+
+1. 双循环
+2. 内循环把最大的值交换到数组末尾
+3. 再次开始内循环跳过最后已交换的最大值
+4. 跳过 `len - 1`，即最后一次循环第一位无需交换
+
+```js
+export default function bubbleSort(arr) {
+  if (arr.length === 0) throw new Error()
+
+  const len = arr.length
+
+  for (let i = 0; i < len - 1; i++) {
+    for (let j = 0; j < len - 1 - i; j++) {
+      if (arr[j] > arr[j + 1]) {
+        ;[arr[j], arr[j + 1]] = [arr[j + 1], arr[j]]
+      }
+    }
+  }
+
+  console.log(arr)
+
+  return arr
+}
+```
+
+## 插入排序--Insertion Sort
+
+1. 比较前两项 进行交换
+2. 比较 2 3 项 如果符合进行交换，再比较 1 2 项
+3. 始终保持前 n 项符合从小到大排列
+
+```js
+/**
+ * @param {Array<number>} arr The input integer array to be sorted.
+ * @return {Array<number>}
+ */
+export default function insertionSort(arr) {
+  if (arr.length < 2) return arr
+
+  for (let i = 1; i < arr.length; i++) {
+    for (let j = i; j > 0; j--) {
+      if (arr[j - 1] > arr[j]) {
+        ;[arr[j], arr[j - 1]] = [arr[j - 1], arr[j]]
+      }
+    }
+  }
+
+  // console.log(arr);
+  return arr
+}
+```
