@@ -1,0 +1,110 @@
+---
+title: react手写js进度条
+date: 2026/01/12 22:58:39
+tag: react,js
+description:
+---
+
+## 进度条组件
+
+![进度条预览](https://image.084612.xyz/%E5%8A%A8%E7%94%BB.gif)
+
+代码可拓展
+
+✅ 暂停 / 恢复
+✅ 变速
+✅ 倒退
+✅ 精确进度控制
+✅ 外部控制开始 / 停止
+✅ 同步多个进度条
+
+```jsx
+import { useEffect, useRef, useState } from 'react'
+import './styles.css'
+
+const DURATION = 2000 // 2000ms
+
+function ProgressBar() {
+  const [progress, setProgress] = useState(0)
+  const startTimeRef = useRef(null)
+
+  useEffect(() => {
+    let rafId
+
+    const animate = timestamp => {
+      if (!startTimeRef.current) {
+        startTimeRef.current = timestamp
+      }
+
+      const elapsed = timestamp - startTimeRef.current
+      const percentage = Math.min((elapsed / DURATION) * 100, 100)
+
+      setProgress(percentage)
+
+      if (percentage < 100) {
+        rafId = requestAnimationFrame(animate)
+      }
+    }
+
+    rafId = requestAnimationFrame(animate)
+
+    return () => cancelAnimationFrame(rafId)
+  }, [])
+
+  return (
+    <div className="progressbar">
+      <div className="progress" style={{ width: `${progress}%` }} />
+    </div>
+  )
+}
+
+export default function App() {
+  const [count, setCount] = useState(0)
+
+  const btnClick = () => {
+    setCount(pre => pre + 1)
+  }
+
+  return (
+    <div>
+      <button onClick={() => btnClick()}>Add</button>
+
+      {Array.from({ length: count }, (_, index) => {
+        return <ProgressBar key={index} />
+      })}
+    </div>
+  )
+}
+```
+
+```css
+.progressbar {
+  margin: 10px 0;
+  height: 20px;
+  display: flex;
+}
+
+.progress {
+  background-color: green;
+}
+```
+
+## react 中使用 requestAnimationFrame 的标准写法
+
+需要在 `useEffect` 中及时清理
+
+```jsx
+useEffect(() => {
+  let rafId
+
+  const animate = () => {
+    rafId = requestAnimationFrame(animate)
+  }
+
+  rafId = requestAnimationFrame(animate)
+
+  return () => {
+    cancelAnimationFrame(rafId) // ✅ 必须清理
+  }
+}, [])
+```
