@@ -1,0 +1,57 @@
+---
+title: 做过的算法题整理
+date: 2026/01/19 22:56:54
+tag: 算法,js
+description:
+---
+
+## 001-获取每个元素除了自身的乘积
+
+leetcode 238
+
+**工作原理:**
+
+```
+输入: [1, 2, 3, 4]
+
+第一遍 (左侧乘积):
+i=0: result[0] = 1,        leftProduct = 1
+i=1: result[1] = 1,        leftProduct = 1*1 = 1
+i=2: result[2] = 1*2 = 2,  leftProduct = 1*2 = 2
+i=3: result[3] = 1*2*3 = 6, leftProduct = 1*2*3 = 6
+result = [1, 1, 2, 6]
+
+第二遍 (右侧乘积):
+i=3: result[3] = 6*1 = 6,       rightProduct = 4
+i=2: result[2] = 2*4 = 8,       rightProduct = 4*3 = 12
+i=1: result[1] = 1*12 = 12,     rightProduct = 12*2 = 24
+i=0: result[0] = 1*24 = 24,     rightProduct = 24*1 = 24
+result = [24, 12, 8, 6]
+```
+
+```ts
+export default function arrayProductExcludingCurrent(numbers: number[]): number[] {
+  const l = numbers.length
+  const result = new Array(l)
+
+  // 获取每一项左边的乘积
+  let left = 1
+  for (let i = 0; i < l; i++) {
+    const element = numbers[i]
+    result[i] = left
+    left *= element
+  }
+
+  // 每一项右边的乘积 乘 左边的乘积
+  let right = 1
+  for (let j = l - 1; j >= 0; j--) {
+    const element = numbers[j]
+    result[j] *= right
+    right *= element
+  }
+
+  console.log(result)
+
+  return result
+}
+```
