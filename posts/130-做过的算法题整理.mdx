@@ -55,3 +55,33 @@ export default function arrayProductExcludingCurrent(numbers: number[]): number[
   return result
 }
 ```
+
+## 002-柯里化
+
+leetcode 2632
+
+思路：
+
+柯里化是将一个函数转换成接受一个参数的函数，返回一个新的函数，该函数接受另一个参数，返回最终结果
+
+收集每次接受的参数，判断目标函数的形参和接收到的实参是否等长，等长后返回函数实际结果，不等长继续收集实参
+
+TIP: 注意 this，在柯里化后，使用 call 保证调用时的 this 指向正确
+
+```js
+function curry(fn) {
+  return function curried(...args) {
+    const thisArg = this
+
+    if (args.length >= fn.length) {
+      // return fn(...args)
+      return fn.call(thisArg, ...args)
+    } else {
+      return function (...rest) {
+        // return curried(...args, ...rest)
+        return curried.call(thisArg, ...args, ...rest)
+      }
+    }
+  }
+}
+```
