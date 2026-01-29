@@ -1,0 +1,95 @@
+---
+title: git rebase使用
+date: 2026/01/29 11:29:06
+tag: git
+description: 结合实际场景 使用git rebase
+---
+
+## 普通 rebase 使用场景
+
+主分支 master，开发分支 dev
+
+基于 master 分支拉出了 dev 分支，做出了很多次提交
+
+准备提交前 有人先于我提交到了 master，会导致 merge 时自动多了一条合并提交
+
+好处是可以让提交记录变得好看，不会多一条合并提交，且提交记录是一条直线
+
+```bash
+# 主分支
+git pull
+
+# 切换到 dev 分支
+git checkout dev
+
+# dev分支使用rebase
+git rebase master
+
+# 切换回master分支进行合并
+git checkout master
+git merge dev
+```
+
+## 交互式 rebase 使用场景
+
+主分支 master，开发分支 dev
+
+基于 master 分支拉出了 dev 分支，做出了很多次提交
+
+其中有多个调试用提交，不应该直接 merge 到主分支
+
+### 操作步骤
+
+```bash
+# 切换到 dev 分支
+git checkout dev
+
+# 在备份分支使用rebase
+git switch -c dev_rebase
+
+# hash是最早的一次提交的hash
+git rebase -i [hash]^
+```
+
+1. 在打开的编辑器中：
+
+- 将不需要提交的 `hash` 前的 'pick' 改为 'drop'：
+- 对于已经 cherry-pick 过的重复提交，也改为 'drop'
+- 保留其他提交为 'pick'
+
+2. 保存并退出编辑器
+
+## git rebase 的注意事项
+
+- **不要 rebase 已推送到公共分支的提交**
+- 不要 rebase master、main 等主分支
+- 不要 rebase 其他人正在基于工作的分支
+- 只在个人开发分支上使用 rebase
+- 原因：rebase 会改变提交历史，导致其他人的分支无法正常合并
+
+## 常用命令
+
+```bash
+# 解决冲突后继续
+git add .
+git rebase --continue
+
+# 跳过当前提交（如果提交已存在）
+git rebase --skip
+
+# 放弃 rebase，恢复到 rebase 前的状态
+git rebase --abort
+
+# 查看 rebase 进度
+git status
+```
+
+### 交互式变基
+
+常用操作命令：
+
+- pick - 保留该提交
+- drop - 删除该提交
+- squash - 合并到上一个提交
+- reword - 修改提交信息
+- edit - 停下来修改该提交
