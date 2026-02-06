@@ -1,0 +1,58 @@
+---
+title: 配合后端同事修改后台地图定位定位显示错误
+date: 2026/02/06 14:02:33
+tag: gis,浏览器,实用经验
+description: 使用浏览器的本地替代功能，修复.net同事开发的地图后台的问题
+---
+
+## 问题
+
+同事使用的全栈后台模板，内部使用了 bigmap 开发地图
+
+遇到了定位点偏移的问题：前端传递的经纬度是 wgs84 坐标系，而 bigmap 用的地图源是百度坐标系，因此在地图上渲染自定义 Marker 时需要提前转换为百度坐标系
+
+但是不清楚同事的后台是如何开发的，后台不支持 es6 语法，不支持 require 不支持 import，本地也没有环境给我运行修改
+
+## 解决
+
+使用 chrome 浏览器的本地替代功能
+
+1. 开发者工具中 ctrl + p 打开对应的地图 js
+2. 在地图 js 中引入坐标转换库
+
+- 使用 script 标签 绝对定位引入本地的静态资源文件
+
+3. 地图 js 新增一个转换方法
+4. 刷新页面，观察效果
+
+### 引入 js 文件
+
+```js
+function loadScript(callback) {
+  var script = ['/map/js/gcoord.global.prod.js']
+
+  var link = document.createElement('link')
+  link.rel = 'stylesheet'
+  link.async = false
+
+  var loads = script.map(function (v) {
+    var script = document.createElement('script')
+    script.src = v
+    document.head.appendChild(script)
+    return script
+  })
+  var end = loads.pop()
+  end.onload = callback
+}
+
+// 在回调中，经纬度转换的js已经加载完成
+loadScript(function () {
+  // do something
+})
+```
+
+### 本地替换
+
+可以在浏览器直接模拟对应的资源替换
+
+![](https://image.084612.xyz/20260206141203610.png)
