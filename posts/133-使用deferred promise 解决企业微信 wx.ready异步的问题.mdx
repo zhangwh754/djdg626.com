@@ -1,0 +1,86 @@
+---
+title: 使用deferred promise 解决企业微信 wx.ready异步的问题
+date: 2026/02/11 15:33:11
+tag: 异步,js
+description: 在webview的chrome_inspect调试企业微信应用时，使用刷新功能会导致白屏/功能无法正常使用
+---
+
+## 问题
+
+在 webview 的 chrome_inspect 调试企业微信应用时，使用刷新功能会导致白屏/功能无法正常使用
+
+## 原因
+
+类企业微信的环境，jsBridge 接口需要在 wx.ready 后执行
+
+如果在页面跳转后，路由已经跳转时 刷新页面，会导致先执行 jsBridge，再执行 wx.ready，导致白屏/功能无法正常使用
+
+## 解决
+
+在 App.vue 中，构建一个临时变量 isReady，判断 wx.ready 是否已经执行，如果还没有执行 就阻断页面跳转
+
+```vue
+<script setup>
+import { onMounted, ref } from 'vue'
+import { RouterLink, RouterView, useRouter } from 'vue-router'
+
+const router = useRouter()
+const wxReady = ref(false)
+
+// wx.ready 标志位
+let resolveWxReady = null
+const wxReadyPromise = new Promise(resolve => {
+  resolveWxReady = resolve
+})
+
+// 路由守卫：等待 wx.ready 后才允许跳转
+router.beforeEach(async (to, from, next) => {
+  if (import.meta.env.MODE === 'dev' || to.path === '/login') {
+    next()
+    return
+  }
+
+  if (!wxReady.value) {
+    // 等待 wx.ready
+    await wxReadyPromise
+  }
+  next()
+})
+
+onMounted(() => {
+  if (import.meta.env.MODE !== 'dev') {
+    wx.ready(() => {
+      console.log('wx ready')
+      wxReady.value = true
+      if (resolveWxReady) resolveWxReady(true)
+      router.replace('/login') // 加载完成跳转到首页
+    })
+
+    wx.error(err => {
+      console.error('wx config error:', err)
+      // 配置失败也标记为 ready，避免一直阻塞
+      wxReady.value = true
+      if (resolveWxReady) resolveWxReady(true)
+    })
+
+    wx.config({
+      //...
+    })
+  }
+})
+</script>
+```
+
+## 总结
+
+遇到相似的场景，可以声明一个临时变量
+
+创建一个 Promise，把这个 Promise 的 resolve 用这个临时变量外置
+
+路由守卫等待 Promise resolve 后再允许跳转
+
+外部 SDK 配置完成后，触发 resolve
+
+## 参考
+
+[Promise 的 deferred 对象详解](https://juejin.cn/post/7065875009276739597?searchId=20260211155359BF59EB573029A984D760)
