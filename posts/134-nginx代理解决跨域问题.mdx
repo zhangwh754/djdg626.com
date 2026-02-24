@@ -1,0 +1,59 @@
+---
+title: nginx代理解决跨域问题
+date: 2026/02/24 15:10:26
+tag: nginx,跨域
+description: 在测试环境中使用nginx代理前端项目
+---
+
+## 前端代理
+
+前端代理，把静态资源放到服务器的对应目录，用 nginx 代理
+
+访问使用服务器地址：http://127.0.0.1/yprh-screen
+
+```conf
+http {
+  server {
+    listen 80;
+    server_name 127.0.0.1;
+
+    location /yprh-screen {
+      alias E:/project/working_project/类后台/基于营配融合的网格电费管理提升/dist;
+      index index.html;
+      try_files $uri $uri/ $uri.html /index.html;
+    }
+  }
+}
+```
+
+## 后端代理
+
+后端代理，在 proxy_pass 写实际调用的 ip 和端口
+location 的 /yprh-api 是前端访问的路径
+即需要修改前端请求地址的配置
+
+```conf
+http {
+  server {
+    listen 80;
+    server_name 127.0.0.1;
+
+    # yprh-screen 跨域代理
+    location /yprh-api {
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      # 处理预检请求
+      if ($request_method = OPTIONS) {
+        add_header Access-Control-Allow-Origin *;
+        add_header Access-Control-Allow-Methods "GET, POST, OPTIONS, PUT, DELETE";
+        add_header Access-Control-Allow-Headers "Content-Type, Authorization, Accept";
+        return 204;
+      }
+      rewrite ^/yprh-api/(.*)$ /$1 break;
+      proxy_pass http://192.168.1.191:8096;
+    }
+  }
+}
+```
