@@ -1,0 +1,171 @@
+---
+title: node环境使用需要dom的库
+date: 2026/02/28 15:58:09
+tag: node,dom
+description: 开发了一个笔记的项目 需要在服务端提供一个转换md文件/md内容的api，使用tiptap库 但是这个库需要dom环境
+---
+
+## dom 报错
+
+安装了 tiptap 的 markdown 插件，使用 editor.markdown.parse 方法，转换报错
+
+`[tiptap error]: there is no window object available, so this function cannot be used`
+
+根据错误提示，代表 node 环境没有 dom 环境，需要安装 dom 环境，例如 jsdom
+
+## jsdom
+
+代码调用前手动挂载 window 和 document
+
+```js
+import { JSDOM } from 'jsdom'
+
+if (!global.document) {
+  const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>')
+  global.window = dom.window
+  global.document = dom.window.document
+}
+```
+
+## 完整代码
+
+```js
+// 安装依赖：
+import { JSDOM } from 'jsdom'
+import StarterKit from '@tiptap/starter-kit'
+import Router from 'koa-router'
+import { Editor } from '@tiptap/core'
+import { Markdown } from '@tiptap/markdown'
+import multer from '@koa/multer'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import fs from 'fs/promises'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: path.join(__dirname, '..', 'uploads'),
+  filename: (ctx, file, cb) => {
+    // Generate unique filename
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9)
+    cb(null, uniqueSuffix + '-' + file.originalname)
+  },
+})
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+})
+
+const router = new Router({
+  prefix: '/api/utils',
+})
+
+// 文件上传方式
+router.post('/md-convert/file', upload.single('file'), async ctx => {
+  if (!global.document) {
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>')
+    global.window = dom.window
+    global.document = dom.window.document
+  }
+
+  const file = ctx.request.file
+
+  if (!file) {
+    ctx.status = 400
+    ctx.body = {
+      success: false,
+      error: { message: 'No file uploaded' },
+    }
+    return
+  }
+
+  if (!file.originalname.toLowerCase().endsWith('.md')) {
+    try {
+      await fs.unlink(file.path)
+    } catch (e) {
+      // ignore
+    }
+    ctx.status = 400
+    ctx.body = {
+      success: false,
+      error: { message: 'Only .md files are allowed' },
+    }
+    return
+  }
+
+  try {
+    const markdownContent = await fs.readFile(file.path, 'utf-8')
+    await fs.unlink(file.path)
+
+    const editor = new Editor({
+      extensions: [StarterKit, Markdown],
+    })
+
+    const tiptapJSON = editor.markdown.parse(markdownContent)
+
+    ctx.body = {
+      success: true,
+      data: tiptapJSON,
+    }
+  } catch (error) {
+    console.error(error)
+
+    try {
+      await fs.unlink(file.path)
+    } catch (e) {
+      // ignore
+    }
+
+    ctx.status = 500
+    ctx.body = {
+      success: false,
+      error: { message: 'convert error', details: error.message },
+    }
+  }
+})
+
+// JSON 方式
+router.post('/md-convert/json', async ctx => {
+  if (!global.document) {
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>')
+    global.window = dom.window
+    global.document = dom.window.document
+  }
+
+  const { content } = ctx.request.body || {}
+
+  if (!content) {
+    ctx.status = 400
+    ctx.body = {
+      success: false,
+      error: { message: 'No content provided' },
+    }
+    return
+  }
+
+  try {
+    const editor = new Editor({
+      extensions: [StarterKit, Markdown],
+    })
+
+    const tiptapJSON = editor.markdown.parse(content)
+
+    ctx.body = {
+      success: true,
+      data: tiptapJSON,
+    }
+  } catch (error) {
+    console.error(error)
+
+    ctx.status = 500
+    ctx.body = {
+      success: false,
+      error: { message: 'convert error', details: error.message },
+    }
+  }
+})
+
+export default router
+```
