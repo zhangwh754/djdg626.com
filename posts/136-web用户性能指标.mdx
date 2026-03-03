@@ -1,0 +1,69 @@
+---
+title: web用户性能指标
+date: 2026/03/03 14:42:41
+tag: 性能,浏览器
+description: 借助浏览器提供的window.performance以及性能面板，判断LCP、CLS、FCP三个关键性能参数
+---
+
+## 三种性能指标的概念
+
+### LCP
+
+Largest Contentful Paint：视口最大文本/图片/视频的渲染时间（网页主要内容加载完毕的时间）
+
+LCP 过高一般是图片的影响
+
+1. 首屏视口的图片进行预加载/缓存，减少图片体积（webp 等）
+2. 首屏的元素不使用懒加载
+3. 首屏使用 img 而不是 background，浏览器可以更快的调度
+
+### FCP
+
+First Contentful Paint：网页任何一个部分的渲染时间
+
+FCP 指标偏低一般是页面资源加载过多，应该减少资源大小及数量
+
+1. gzip 压缩
+2. cdn 优化
+3. 去除非必要的 script，添加 defer
+
+### CLS
+
+Cumulative Layout Shift：网页整体偏移量
+
+CLS 过高一般是页面加载完成后又发生偏移
+
+1. 图片没有设置宽高
+2. 互联网字体切换（大小不同）导致回流
+3. 动态的 Toast、Popup 等挤占了内容（应脱离文档流）
+
+## js 获取性能指标
+
+使用 web-vitals 库
+
+其中不同的指标上报时机不同
+
+- FCP — 页面首次内容绘制完就立即触发，所以最先打印。
+- LCP — 只在以下情况才上报：
+
+用户与页面产生交互（点击、键盘输入）
+页面切换到后台（tab 切换、最小化）
+页面卸载
+
+- CLS — 只在以下情况才上报：
+
+页面切换到后台（tab 切换、最小化）
+页面卸载
+
+```js
+import { onFCP, onLCP, onCLS } from 'web-vitals'
+
+onFCP(console.log)
+onLCP(console.log)
+onCLS(console.log, { reportAllChanges: true })
+```
+
+## 参考
+
+- [性能指标](https://developer.mozilla.org/zh-CN/docs/Web/API/Performance)
+- [google 性能指标文档](https://web.dev/explore/metrics?hl=zh-cn)
