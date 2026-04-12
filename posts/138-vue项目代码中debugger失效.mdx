@@ -1,0 +1,56 @@
+---
+title: vue项目代码中debugger失效
+date: 2026/04/12 20:56:18
+tag: 浏览器
+description:
+---
+
+## 标题
+
+最近换了工作，安装好环境跑起来项目发现代码中的vue项目debugger不触发了，但是js的还是正常的
+
+期初以为是vue devtools的问题，后面又以为是webpack或loader的问题，今天在自己新建的项目发现也不行。
+
+这才发现是浏览器配置的问题。
+
+## 解决方式
+
+解决方案:取消对 node_modules 的忽略
+默认情况下，Chrome 会自动忽略 node_modules 下的脚本，导致你在业务代码中写的 debugger 无法命中。
+
+操作步骤如下：
+1. 打开 DevTools → 点击右上角 三个点 → “设置”（⚙️）
+
+2. 在左侧菜单选择 “忽略列表”
+
+3. 找到 “自定义排除规则” 中的：`/node_modules/*node` 将其 取消勾选 或删除
+
+4. 保存设置，刷新页面
+
+## vscode编辑器断点调试
+
+npm启动项目后 f5启动断点调试
+需要先用cmd命令启动调试窗口的chrome
+
+```
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "chrome",
+      "request": "attach",
+      "name": "Attach Chrome",
+      "port": 9222,
+      "webRoot": "${workspaceFolder}"
+    }
+  ]
+}
+```
+
+```cmd
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\temp\chrome-debug"
+```
+
+## 参考
+
+[https://blog.csdn.net/qq_45761438/article/details/158039799](vue项目的debugger不生效的解决办法)
