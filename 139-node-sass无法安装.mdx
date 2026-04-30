@@ -1,0 +1,38 @@
+---
+title: node-sass无法安装
+date: 2026-04-30
+tag: js
+description: 
+---
+
+## N/A
+
+公司的旧项目使用了node-sass 不敢删除 开发环境又无法安装成功 导致无法install node_modules，临时用hack模拟跳过node-scss的安装，转而使用兼容的sass
+
+```
+const fs = require('fs');
+const path = require('path');
+
+const dir = path.join(__dirname, 'node_modules/node-sass');
+
+if (!fs.existsSync(dir)) {
+  fs.mkdirSync(dir, { recursive: true });
+}
+
+fs.writeFileSync(
+  path.join(dir, 'index.js'),
+  "module.exports = require('sass');"
+);
+
+fs.writeFileSync(
+  path.join(dir, 'package.json'),
+  JSON.stringify({
+    name: 'node-sass',
+    version: '4.14.1',
+    main: 'index.js'
+  }, null, 2)
+);
+
+console.log('✅ node-sass 已被替换为 sass');
+
+```
