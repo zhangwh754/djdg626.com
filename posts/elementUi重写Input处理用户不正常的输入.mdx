@@ -1,0 +1,60 @@
+---
+title: elementUi重写Input处理用户不正常的输入.mdx
+date: 2026-05-07
+tag: vue
+description: 重写组件，全局处理用户复制或输入额外的空格 避免修改业务代码
+---
+
+## N/A
+
+公司对接接口时，测试发现了在elementUi的el-description-item中复制文本到Input处会额外携带`\t`导致服务端接口报错
+经过讨论需要前端来进行适配
+调研后决定增强elementUi的Input、Select组件，TextArea暂时不做处理
+在组件的原有输入、Blur方法上增加Trim的处理，可以自动去掉首尾的`/t`和`空格`
+
+```js
+// plugins/trimInput.js
+import { Input, Select } from "element-ui";
+
+const TrimInputPlugin = {
+  install(Vue) {
+    // 继承 el-input，重写 handleInput
+    const TrimInput = {
+      extends: Input,
+      methods: {
+        handleBlur(event) {
+          // 先调用原有 blur 逻辑（触发 validate 等）
+          Input.methods.handleBlur.call(this, event);
+
+          const trimmed = event.target.value.trim();
+
+          if (trimmed !== event.target.value) {
+            this.$emit("input", trimmed);
+            this.$nextTick(() => {
+              const nativeInput = this.$refs.input || this.$refs.textarea;
+              if (nativeInput) nativeInput.value = trimmed;
+            });
+          }
+        },
+      },
+    };
+
+    // 重写可搜索的ElSelect
+    const TrimSelect = {
+      extends: Select,
+      methods: {
+        // filterable 时，用户输入搜索词走这里
+        handleQueryChange(val) {
+          Select.methods.handleQueryChange.call(this, val.trim());
+        },
+      },
+    };
+
+    Vue.component("ElInput", TrimInput);
+    Vue.component("ElSelect", TrimSelect);
+  },
+};
+
+export default TrimInputPlugin;
+```
+
