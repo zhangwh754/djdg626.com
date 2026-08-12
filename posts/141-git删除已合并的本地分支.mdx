@@ -1,0 +1,16 @@
+---
+title: git删除已合并的本地分支
+date: 2026/08/12 08:19:32
+tag: git
+description:
+---
+
+## N/A
+
+```
+# 查看会删哪些
+git branch --merged | grep -v '^\*'
+
+# 删除已经合并的分支
+git branch --merged | grep -v '^\*' | xargs git branch -d
+```
