@@ -1,0 +1,254 @@
+---
+title: 枚举构建方法defineEnum
+date: 2026/09/12 10:10:05
+tag: js,vue
+description: vue中使用枚举，传入key回显时和循环时使用变扭，封装了defineEnum优化使用方式
+---
+
+## 问题
+
+vue 项目里枚举一般有两种定义方式，各自只照顾一半场景
+
+数组形式，适合 v-for 渲染下拉选项，但通过 key 回显 label 很别扭：
+
+```js
+const statusOptions = [
+  { value: 10, label: '启用' },
+  { value: 20, label: '禁用' }
+]
+
+// 回显要 find 一遍，写在模板里更长
+const label = statusOptions.find(item => item.value === row.status)?.label
+```
+
+对象形式，回显方便，但渲染选项又要转换一遍：
+
+```js
+const statusMap = {
+  10: '启用',
+  20: '禁用'
+}
+
+// 回显方便
+statusMap[row.status]
+
+// 渲染选项要遍历转换
+Object.entries(statusMap).map(([value, label]) => ({ value, label }))
+```
+
+于是封装了 defineEnum，一处定义，回显和循环都顺手：
+
+- `Enum[key]` 直接回显，number / string key 通吃，取不到时返回 `''` 而不是 undefined
+- `Enum.list` 直接 v-for 渲染选项，支持 hidden（只回显、不出现在选项里）和 sort（自定义排序）
+- 支持直接遍历、数组方法、values / labels
+
+## 代码
+
+```js
+/**
+ * 定义枚举
+ *
+ * 支持：
+ * defineEnum([
+ *   { value: 10, label: '启用' },
+ *   { value: 20, label: '禁用' }
+ * ])
+ *
+ * defineEnum({
+ *   10: '启用',
+ *   20: '禁用'
+ * })
+ *
+ * 使用：
+ * StatusEnum[10]       // '启用'
+ * StatusEnum.list      // [{ value: 10, label: '启用' }, ...]
+ * StatusEnum.find(...) // 支持数组方法
+ * v-for="item in StatusEnum.list"
+ */
+export function defineEnum(input) {
+  const list = Array.isArray(input)
+    ? input
+    : Object.entries(input).map(([value, label]) => ({
+      // value: Number(value),
+      value: value,
+      label
+    }))
+
+  const map = new Map(
+    list.map(item => [String(item.value), item.label])
+  )
+
+  return new Proxy({}, {
+    get(target, key) {
+      // 原始列表（hidden 项仅用于回显，不出现在选项中）
+      if (key === 'list') {
+        return list.filter(item => !item.hidden).sort((a, b) => {
+          if (+a.value === 999) return -1
+          if (+b.value === 999) return 1
+          // 优先按自定义排序值排列，未配置时继续使用枚举值
+          const aSort = a.sort === undefined ? +a.value : +a.sort
+          const bSort = b.sort === undefined ? +b.value : +b.sort
+          return aSort - bSort
+        })
+      }
+
+      // 支持 Enum.values
+      if (key === 'values') {
+        return list.map(item => item.value)
+      }
+
+      // 支持 Enum.labels
+      if (key === 'labels') {
+        return list.map(item => item.label)
+      }
+
+      // 支持 v-for="item in Enum"
+      if (key === Symbol.iterator) {
+        return list[Symbol.iterator].bind(list)
+      }
+
+      // 支持 JSON.stringify(Enum)
+      if (key === 'toJSON') {
+        return () => list
+      }
+
+      // 支持 Enum[10] / Enum['10']
+      if (map.has(String(key))) {
+        return map.get(String(key))
+      }
+
+      // 支持数组方法：find / map / filter / some / every...
+      const arrayMethods = [
+        'find',
+        'map',
+        'filter',
+        'some',
+        'every',
+        'forEach',
+        'reduce',
+        'includes',
+        'indexOf',
+        'findIndex'
+      ]
+
+      if (arrayMethods.includes(key)) {
+        return list[key].bind(list)
+      }
+
+      return ''
+    },
+
+    // 支持 Object.keys(Enum)、部分框架遍历
+    ownKeys() {
+      return Reflect.ownKeys(list)
+    },
+
+    getOwnPropertyDescriptor(target, key) {
+      if (key in list) {
+        return {
+          enumerable: true,
+          configurable: true
+        }
+      }
+
+      return undefined
+    }
+  })
+}
+```
+
+## 使用示例
+
+定义：
+
+```js
+import { defineEnum } from '@/utils/defineEnum'
+
+// 数组形式：需要 hidden、sort 等配置时使用
+const StatusEnum = defineEnum([
+  { value: 10, label: '启用' },
+  { value: 20, label: '禁用' },
+  { value: 30, label: '待审核', sort: 0 },      // 自定义排序，排在最前
+  { value: 99, label: '已删除', hidden: true }  // 仅用于回显，不出现在下拉选项中
+])
+
+// 对象形式：简单场景更省事
+const TypeEnum = defineEnum({
+  10: '普通订单',
+  20: '预售订单'
+})
+```
+
+模板中：
+
+```vue
+<!-- 回显：数字 / 字符串 key 都能命中 -->
+<el-tag>{{ StatusEnum[row.status] }}</el-tag>
+
+<!-- 下拉选项：list 已自动过滤 hidden 并排好序 -->
+<el-select v-model="form.status">
+  <el-option
+    v-for="item in StatusEnum.list"
+    :key="item.value"
+    :label="item.label"
+    :value="item.value"
+  />
+</el-select>
+
+<!-- 也可以直接遍历枚举本身 -->
+<li v-for="item in StatusEnum" :key="item.value">{{ item.label }}</li>
+```
+
+js 中：
+
+```js
+StatusEnum[10]        // '启用'
+StatusEnum['10']      // '启用'，后端返回字符串 key 也能命中
+StatusEnum.list       // [{ value: 30, label: '待审核' }, { value: 10, ... }, ...]，不含 hidden 项
+StatusEnum.values     // [10, 20, 30, 99]，全量 value
+StatusEnum.labels     // ['启用', '禁用', '待审核', '已删除']
+
+// 数组方法直接用，操作的是全量列表（含 hidden），回显被隐藏的项也没问题
+StatusEnum.find(item => item.value === 99)  // { value: 99, label: '已删除' }
+StatusEnum.map(item => item.label)
+
+JSON.stringify(StatusEnum)  // 直接序列化为列表，打印调试方便
+```
+
+## 实现要点
+
+key 统一转成字符串，用 Map 存储：
+
+```js
+const map = new Map(
+  list.map(item => [String(item.value), item.label])
+)
+```
+
+取值时 `map.get(String(key))`，所以 `Enum[10]` 和 `Enum['10']` 都能命中，不用关心后端给的是 number 还是 string
+
+另外对象形式的 key 本身就是字符串（`{ 10: '启用' }` 的 key 实际是 `'10'`），想统一成数字 value 的话，打开代码里注释掉的 `value: Number(value)` 即可
+
+Proxy 拦截 get，按 key 依次分流：
+
+- `list`：过滤 hidden 后排序返回。默认按 value 升序，配了 sort 的用 sort，value 为 999 的约定排最前（放"全部"这类选项）
+- `values` / `labels`：全量列表的 value / label 数组
+- `Symbol.iterator`：让枚举本身可迭代，`v-for="item in Enum"` 直接可用（vue3 的 v-for 对对象会优先走迭代器协议）
+- `toJSON`：`JSON.stringify(Enum)` 输出可读的列表
+- 命中 map：返回 label
+- 数组方法名：直接绑定到内部 list 上
+- 兜底返回 `''`：模板里 `{{ Enum[key] }}` 遇到脏数据时显示空白，而不是 undefined
+
+ownKeys / getOwnPropertyDescriptor 两个 trap 配合，让 `Object.keys()`、部分框架的遍历逻辑不至于报错
+
+## 注意
+
+`Enum[key]` 永远有返回值（不命中时是 `''`），所以不能用 `if (Enum[key])` 判断 key 是否存在，判断存在性用 `Enum.values.includes(key)`（注意和后端返回的类型保持一致）
+
+## 总结
+
+一枚举两用：对象式的回显 `Enum[key]` + 数组式的选项 `Enum.list`，hidden 和 sort 覆盖了"仅回显"和"全部排最前"两个常见需求，number / string key 通吃
+
+## 参考
+
+[MDN Proxy](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Proxy)
