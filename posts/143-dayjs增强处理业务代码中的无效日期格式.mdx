@@ -1,0 +1,121 @@
+---
+title: dayjs增强处理业务代码中的无效日期格式
+date: 2026/09/12 10:35:58
+tag: js,date
+description: 根据业务需求，处理无效日期格式
+---
+
+## 问题
+
+业务代码里，后端返回的日期字段经常不是正常日期：
+
+- 库里没值时，MySQL 的 datetime 字段会给零值占位日期 `0000-00-00`、`0000-00-00 00:00:00`
+- 接口没返回这个字段时，拿到的是 null / undefined / ''
+
+dayjs 处理这些值不会报错，但渲染出来的结果没法看：
+
+```js
+dayjs(null).format('YYYY-MM-DD')           // 'Invalid Date'
+dayjs('').format('YYYY-MM-DD')             // 'Invalid Date'
+dayjs('0000-00-00').format('YYYY-MM-DD')   // '1899-11-30'，月份日期为 0 会向前回绕
+```
+
+于是每个回显的地方都要写兜底：
+
+```vue
+{{ row.createTime && row.createTime !== '0000-00-00 00:00:00' ? dayjs(row.createTime).format('YYYY-MM-DD HH:mm:ss') : '--' }}
+```
+
+判断又臭又长，散落在各个模板里，新加一个页面就容易漏
+
+## 思路
+
+与其到处判空，不如把"无效日期"的判断收敛到一处：包一层 dayjs
+
+- 正常日期：透传 dayjs，行为不变
+- 空值 / 占位日期：返回一个兜底对象，format 恒定返回 '--'
+
+再以 vue 插件的形式挂到 `Vue.prototype.$dayjs`，全局直接用
+
+## 代码
+
+```js
+import dayjs from 'dayjs'
+
+export default {
+  install(Vue) {
+    /**
+    * 包装 dayjs
+    * 统一处理异常日期
+    */
+    const $dayjs = (...args) => {
+      // 未传参数时返回当前日期
+      if (args.length === 0) return dayjs()
+
+      const date = args[0]
+      // 处理空值和非法占位日期
+      if (
+        !date ||
+        date === '0000-00-00' ||
+        date === '0000-00-00 00:00:00'
+      ) {
+        return Object.assign({
+          ...dayjs(), format: () => {
+            return '--'
+          }
+        })
+      } else return dayjs(date)
+    }
+
+    Vue.prototype.$dayjs = $dayjs
+  }
+}
+```
+
+## 使用示例
+
+main.js 注册插件：
+
+```js
+import $dayjs from './plugins/dayjs'
+
+Vue.use($dayjs)
+```
+
+模板中正常使用，不用再判空：
+
+```vue
+<el-table-column label="创建时间">
+  <template slot-scope="{ row }">
+    {{ $dayjs(row.createTime).format('YYYY-MM-DD HH:mm:ss') }}
+  </template>
+</el-table-column>
+```
+
+- `row.createTime` 是正常日期：正常格式化
+- 是 null / '' / 0000-00-00：统一显示 `--`
+
+js 里通过 `this.$dayjs(...)` 使用
+
+## 实现要点
+
+- 不传参数时保持 dayjs 原行为，返回当前时间
+- `!date` 兜住 null / undefined / ''
+- `'0000-00-00'`、`'0000-00-00 00:00:00'` 是 MySQL datetime 的零值占位日期，单独匹配
+- 兜底对象是 `{ ...dayjs(), format: () => '--' }`，对外的 API 只有 format，正好够回显用
+
+## 注意
+
+兜底对象只保证了 format 可用：dayjs 实例的方法都在原型上，展开运算符拷贝不到，对它调用 `.add()`、`.diff()` 等方法会报错
+
+所以这层包装适合回显场景，日期计算还是判断有效后再用原生的 dayjs
+
+业务里如果还有别的占位格式（比如 `1970-01-01`），直接往判断条件里加就行
+
+## 总结
+
+无效日期的判断收敛到一处，模板里只管 format，脏数据统一显示 '--'
+
+## 参考
+
+[dayjs 文档](https://dayjs.js.org/)
