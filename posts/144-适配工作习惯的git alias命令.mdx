@@ -1,0 +1,62 @@
+---
+title: 适配工作习惯的git alias命令
+date: 2026/09/14 17:07:59
+tag: git
+description: 公司工作流是推test分支触发测试环境，封装一个git alias，在任意开发分支一条命令完成同步rebase推送，不用来回切分支
+---
+
+## 场景
+
+公司的工作流是：推送到远程 test 分支，自动触发测试环境部署
+
+日常在不同的功能分支上开发，每次想看效果都要手动走一遍：
+
+```bash
+git checkout test
+git pull
+git merge feature-xxx
+git push
+git checkout feature-xxx
+```
+
+来回切分支很繁琐，merge 还会产生一条合并提交
+
+于是封装了一个 alias，在当前分支直接执行 `git test`，一条命令完成：检查工作区 → 拉最新 origin/test → rebase → 推送，全程不切分支
+
+## 命令
+
+```bash
+git config --global alias.test '!f() { \
+  if ! git diff --quiet || ! git diff --cached --quiet; then \
+    echo "❌ 工作区有未提交修改，请先 commit 或 stash"; \
+    exit 1; \
+  fi; \
+  echo "⬇️  Fetch origin/test..."; \
+  git fetch origin test || exit 1; \
+  echo "🔄 Rebase onto origin/test..."; \
+  git rebase origin/test || { \
+    echo "❌ Rebase 冲突。解决后执行 git rebase --continue，或 git rebase --abort"; \
+    exit 1; \
+  }; \
+  echo "🚀 Push HEAD -> origin/test..."; \
+  git push origin HEAD:test; \
+}; f'
+```
+
+配置好后，任意分支上提交完代码，执行：
+
+```bash
+git test
+```
+
+## alias 管理
+
+```bash
+# 查看已配置的所有 alias
+git config --get-regexp '^alias\.'
+
+# 删除这个 alias
+git config --global --unset alias.test
+
+# 或者直接编辑 ~/.gitconfig 的 [alias] 段
+```
