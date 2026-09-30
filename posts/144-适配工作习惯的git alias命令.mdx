@@ -2,7 +2,7 @@
 title: 适配工作习惯的git alias命令
 date: 2026/09/14 17:07:59
 tag: git
-description: 公司工作流是推test分支触发测试环境，封装git test和git hotfix两个alias：任意分支一键同步rebase推送test，hotfix一键完成master合并与test同步
+description: 公司工作流是推test分支触发测试环境，封装git test alias：
 ---
 
 ## 场景
@@ -23,25 +23,28 @@ git checkout feature-xxx
 
 来回切分支很繁琐，merge 还会产生一条合并提交
 
-于是封装了两个 alias：常规验证用 `git test`，在当前分支一条命令完成检查工作区 → 拉最新 origin/test → rebase → 推送，全程不切分支；线上修复的收尾链路用 `git hotfix`
+于是封装了两个 alias：常规验证用 `git test`，在当前分支一条命令完成检查工作区 → 拉最新 origin/test → rebase → 推送，全程不切分支
 
 ## git test
 
 ```bash
-git config --global alias.test '!f() { \
-  if ! git diff --quiet || ! git diff --cached --quiet; then \
-    echo "❌ 工作区有未提交修改，请先 commit 或 stash"; \
-    exit 1; \
-  fi; \
-  echo "⬇️  Fetch origin/test..."; \
-  git fetch origin test || exit 1; \
-  echo "🔄 Rebase onto origin/test..."; \
-  git rebase origin/test || { \
-    echo "❌ Rebase 冲突。解决后执行 git rebase --continue，或 git rebase --abort"; \
-    exit 1; \
-  }; \
-  echo "🚀 Push HEAD -> origin/test..."; \
-  git push origin HEAD:test; \
+git config --global alias.test '!f() {
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    echo "❌ 工作区有未提交修改，请先 commit 或 stash"
+    exit 1
+  fi
+
+  echo "⬇️  Fetch origin/test..."
+  git fetch origin test || exit 1
+
+  echo "🔄 Rebase onto origin/test..."
+  git rebase origin/test || {
+    echo "❌ Rebase 冲突。解决后执行 git rebase --continue，或 git rebase --abort"
+    exit 1
+  }
+
+  echo "🚀 Push HEAD -> origin/test..."
+  git push origin HEAD:test
 }; f'
 ```
 
@@ -51,60 +54,11 @@ git config --global alias.test '!f() { \
 git test
 ```
 
-## git hotfix
-
-修线上问题的链路是 master 合并 hotfix 分支、test 再合并一次 master，收尾同样四五步，也封装掉：
-
-```bash
-git config --global alias.hotfix '!f() { \
-  branch=$(git branch --show-current); \
-  if [ "$branch" = "master" ] || [ "$branch" = "test" ]; then \
-    echo "❌ 请切到 hotfix 分支上执行"; \
-    exit 1; \
-  fi; \
-  if ! git diff --quiet || ! git diff --cached --quiet; then \
-    echo "❌ 工作区有未提交修改，请先 commit 或 stash"; \
-    exit 1; \
-  fi; \
-  echo "⬇️  Fetch origin..."; \
-  git fetch origin || exit 1; \
-  echo "📦 master 合并 $branch..."; \
-  git checkout master || exit 1; \
-  git merge --ff-only origin/master || { echo "❌ 本地 master 与远程分叉，请先手动处理"; exit 1; }; \
-  git merge "$branch" || { echo "❌ 冲突。解决后 git add . && git commit，重新执行 git hotfix"; exit 1; }; \
-  git push origin master || exit 1; \
-  echo "📦 test 合并 master..."; \
-  git checkout -B test origin/test || exit 1; \
-  git merge master || { echo "❌ 冲突。解决后 git add . && git commit && git push origin test"; exit 1; }; \
-  git push origin test || exit 1; \
-  echo "↩️  回到 $branch"; \
-  git checkout "$branch"; \
-}; f'
-```
-
-使用：从 master 拉 hotfix 分支，修复提交后执行：
-
-```bash
-git checkout -b hotfix_xxx origin/master
-
-# 修复并 commit 后
-git hotfix
-```
-
-test 推送后自动触发测试环境部署，正好验证修复
-
-几个细节：
-
-- 先记住当前分支，收尾后自动切回来；在 master / test 上执行会直接拒绝
-- master 用 `--ff-only` 对齐远程，本地 master 与远程分叉时直接停下，不做自动合并
-- 本地 test 用 `-B` 重置到 origin/test 再合并 master，始终以远程为准（流程里没人直接往本地 test 提交，重置安全）
-- master 合并冲突时，解决 commit 后重新执行 `git hotfix` 会接着走完剩余步骤；test 合并冲突按提示手动 push 即可
 
 ## 注意
 
 修线上问题的分支慎跑 `git test`：rebase 到 origin/test 后，分支历史里会混入 test 上还没发版的功能，master 直接合并它，未发版的代码就跟着上线了
 
-hotfix 从 master 拉分支、不跑 `git test`，收尾用 `git hotfix` 完成 master 合并与 test 同步；实在要先上测试环境验证，合 master 时改用 squash merge
 
 ## alias 管理
 
