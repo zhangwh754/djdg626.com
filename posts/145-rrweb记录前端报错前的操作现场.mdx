@@ -1,0 +1,215 @@
+---
+title: rrweb记录前端报错前的操作现场
+date: 2026/10/16 10:00:00
+tag: js,vue,rrweb
+description: 用分段缓存保留最近的页面操作，在前端报错时保存一份可回放的现场
+---
+
+## 问题
+
+后台系统里有些错误很难复现：用户改了几个字段，切了一个页签，再点提交，页面就报错了
+
+日志里能看到错误信息和组件堆栈，但看不到用户刚才做了什么。自己照着描述操作，又不一定能遇到
+
+于是想在错误日志旁边加一个回放按钮：报错后直接看前面一小段操作，不用全靠用户回忆
+
+这里记录的是当前标签页里的临时现场，刷新后就没了，没有做服务端上传和长期存储
+
+## 思路
+
+用 rrweb 记录页面快照和后续变化，再交给播放器重建画面。它保存的是事件数据，不是屏幕录像，原理见 [rrweb 指南](https://github.com/rrweb-io/rrweb/blob/main/guide.md)
+
+业务里只需要错误前的一小段，所以分两层存：
+
+- 平时：每隔 10 秒重新生成完整快照，最多保留最近三个片段
+- 报错时：把当前片段合并，保存一份现场，最多保留五份
+
+错误日志只保存 `replayId` 等少量信息，大量事件放在模块作用域的 Map 里，不放进 Vuex
+
+## 代码
+
+下面按项目里的实现拆开说明，省略 UI、日志导出和部分异常处理。代码基于项目使用的 `@rrweb/record`、`rrweb-player` 2.1.6
+
+### 按完整快照切分片段
+
+不能简单地保留最后几百条事件。后面的 DOM 变化依赖前面的完整快照，把完整快照删了，剩下的数据可能就播不了了
+
+```js
+const META_EVENT_TYPE = 4
+const MAX_SEGMENTS = 3
+
+const segments = [[]]
+
+// 按完整快照边界保留最近三个片段
+function appendReplayEvent(event, isCheckout) {
+  // 第一步：周期快照开始时，新建一个片段
+  if (isCheckout && event.type === META_EVENT_TYPE) {
+    segments.push([])
+    if (segments.length > MAX_SEGMENTS) segments.shift()
+  }
+
+  // 第二步：同一次快照的 Meta、FullSnapshot 和后续变化放在一起
+  segments[segments.length - 1].push(event)
+}
+
+// 合并现有片段，保留原有事件顺序
+function collectReplayEvents() {
+  return segments.reduce((events, segment) => events.concat(segment), [])
+}
+```
+
+这里按周期快照的 Meta 事件切段，不能把同一次快照的 Meta 和 FullSnapshot 拆成两段
+
+三个片段大约覆盖最近二三十秒，实际长度受录制时机和页面状态影响，不是严格的 30 秒
+
+### 启动录制
+
+下面是用于说明接入方式的配置，输入内容统一遮罩。项目原提交没有开启输入遮罩，还显式关闭了密码遮罩，这部分不适合作为通用配置直接照搬
+
+```js
+import { record } from '@rrweb/record'
+
+let stopRecorder = null
+
+// 每个标签页只启动一次录制
+export function startErrorReplayRecorder() {
+  if (stopRecorder) return
+
+  stopRecorder = record({
+    emit: appendReplayEvent,
+    checkoutEveryNms: 10 * 1000,
+    sampling: {
+      mousemove: 100,
+      scroll: 150,
+      input: 'last'
+    },
+    maskAllInputs: true,
+    maskInputOptions: { password: true },
+    recordCanvas: false,
+    collectFonts: false,
+    inlineImages: false,
+    recordCrossOriginIframes: false
+  }) || null
+}
+```
+
+项目里还给录制器加了 `errorHandler`：rrweb 自身发生异常时停止录制，不再把它当成新的业务错误继续触发回放
+
+### 错误发生时保存现场
+
+```js
+const replayMap = new Map()
+const replayOrder = []
+let replaySeed = 0
+let lastReplay = null
+
+// 保存错误现场，一秒内的连续错误复用同一份回放
+export function captureErrorReplay(marker) {
+  const capturedAt = Date.now()
+  if (!stopRecorder) return null
+
+  // 第一步：避免同一轮异常连续保存多份相近现场
+  if (
+    lastReplay &&
+    capturedAt - lastReplay.capturedAt <= 1000 &&
+    replayMap.has(lastReplay.replayId)
+  ) {
+    return lastReplay
+  }
+
+  // 第二步：确认存在完整快照，并插入错误时间标记
+  let events = collectReplayEvents()
+  if (!events.some(event => event.type === 2)) return null
+
+  record.addCustomEvent('error', marker)
+  events = collectReplayEvents()
+
+  const replayId = `error-replay-${capturedAt}-${++replaySeed}`
+  const replayDuration = Math.max(0, capturedAt - events[0].timestamp)
+  const replayStartOffset = Math.max(0, replayDuration - 20 * 1000)
+
+  // 第三步：事件留在模块里，日志只引用回放编号
+  replayMap.set(replayId, { events, replayStartOffset })
+  replayOrder.push(replayId)
+
+  // 第四步：超过五份时淘汰最旧的一份
+  if (replayOrder.length > 5) {
+    replayMap.delete(replayOrder.shift())
+  }
+
+  lastReplay = { replayId, capturedAt, replayStartOffset }
+  return lastReplay
+}
+```
+
+这里的“保存现场”是把当时的事件列表单独保留下来，后面的新事件不会继续追加到这份列表里，不是对事件做深冻结
+
+起播点定位到错误前 20 秒，但没有直接把更早的事件切掉，因为播放器仍然需要前面的完整快照来重建页面
+
+## 使用示例
+
+在已有的错误日志入口里，生成日志前调用 `captureErrorReplay`：
+
+```js
+// 在已有日志入口中关联错误现场
+function createErrorLog(error) {
+  const replay = captureErrorReplay({ message: error.message })
+
+  return {
+    message: error.message,
+    stack: error.stack || '',
+    replayId: replay ? replay.replayId : ''
+  }
+}
+```
+
+项目里把 Vue 错误、普通 JS 错误、未处理的 Promise rejection 汇总到同一个入口；接口错误也记录，但不抓取回放。对同一个 Error 对象使用 WeakSet 去重，避免多个入口重复记一遍
+
+点击回放时再加载播放器。下面的 `container` 是已经挂载的播放器容器：
+
+```js
+// 打开指定现场，并跳到错误前的操作位置
+async function openReplay(replayId, container) {
+  const replay = replayMap.get(replayId)
+  if (!replay) return null
+
+  const [playerModule] = await Promise.all([
+    import('rrweb-player'),
+    import('rrweb-player/dist/style.css')
+  ])
+
+  const Player = playerModule.default || playerModule
+  const player = new Player({
+    target: container,
+    props: { events: replay.events, autoPlay: false }
+  })
+
+  player.goto(replay.replayStartOffset, false)
+  return player
+}
+```
+
+Vue 弹窗需要先打开，再等待 `$nextTick()`，才能拿到容器。动态加载期间如果用户已经关闭弹窗，也要停止挂载播放器
+
+## 实现要点
+
+- 按完整快照边界淘汰事件，保证保留下来的片段有可播放的起点
+- 录制缓存和已保存现场分开管理，持续录制不会覆盖已经关联到错误的列表
+- Map 留在模块作用域，Vuex 只存日志元数据
+- 回放过期后显示 Expired，录制不可用时显示 Unavailable，不能只留一个点不动的按钮
+
+## 注意
+
+限制三个片段、五份现场，只限制了数量，没有限制总字节数。页面 DOM 很大、变化很频繁时，事件仍然可能占用较多内存
+
+输入遮罩也不等于整个页面脱敏，普通文本里的姓名、地址等仍需按元素配置遮罩或阻止采集。具体选项见 [rrweb 隐私配置](https://github.com/rrweb-io/rrweb/blob/main/guide.md#privacy)
+
+回放展示的是页面变化，不会重新执行原来的业务请求，也不保证所有外部资源在之后还能加载出来。它适合补充操作上下文，排查时还是要结合堆栈和接口日志
+
+关闭弹窗时需要销毁播放器；当前实现的现场只存在标签页内存里，刷新、关闭页面或被淘汰后就无法再播放
+
+## 参考
+
+[rrweb 指南](https://github.com/rrweb-io/rrweb/blob/main/guide.md)
+
+[rrweb-player](https://github.com/rrweb-io/rrweb/tree/main/packages/rrweb-player)
